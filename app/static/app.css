@@ -51,3 +51,4 @@ details.inline-form summary { font-size: .85rem; }
 .tabs a.active { font-weight: 700; text-decoration: underline; }
 .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .page-header h2 { margin: 0; }
+.msg-photo { display: block; max-width: 220px; max-height: 220px; border-radius: .3rem; margin-bottom: .3rem; }

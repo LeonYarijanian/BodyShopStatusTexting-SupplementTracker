@@ -206,8 +206,13 @@ def deliver(db: Session, message: Message, shop: Shop, shop_settings: ShopSettin
         return
     message.from_e164 = sender_number(shop, shop_settings)
     provider = get_provider(shop_settings, app_settings)
+    extra = {}
+    if message.media_token:
+        from app.media import public_media_url
+
+        extra["media_url"] = public_media_url(message.media_token, app_settings.PUBLIC_BASE_URL)
     try:
-        provider_id = provider.send(message.to_e164, message.body, message.from_e164)
+        provider_id = provider.send(message.to_e164, message.body, message.from_e164, **extra)
     except Exception as exc:  # any provider error marks the message FAILED; no automatic retry
         message.status = MessageStatus.FAILED
         message.error_text = str(exc)[:200]
@@ -272,17 +277,33 @@ def run_sender(now: dt.datetime, db: Session, app_settings: Settings | None = No
 # ---------------------------------------------------------------- manual texts, retry, cancel
 
 
-def send_manual_text(db: Session, ro: RepairOrder, body: str, user_id: int, now: dt.datetime, app_settings: Settings | None = None) -> Message:
+def send_manual_text(
+    db: Session,
+    ro: RepairOrder,
+    body: str,
+    user_id: int,
+    now: dt.datetime,
+    app_settings: Settings | None = None,
+    photo: bytes | None = None,
+) -> Message:
     """Insert a MANUAL message due now and run the sender on it immediately.
 
     Manual texts skip the cool-off window and the daily cap, and still obey consent, quiet hours
-    and rendering rules 2 and 3.
+    and rendering rules 2 and 3. With `photo`, the text goes out as a picture message.
     """
     body = (body or "").strip()
     if ro.customer.anonymized_at is not None:
         raise MessagingError("This customer's data was deleted at their request, so texting is off.")
     if not 1 <= len(body) <= MAX_TEXT_LENGTH:
         raise MessagingError(f"A text must be 1 to {MAX_TEXT_LENGTH} characters.")
+    media_token = media_content_type = None
+    if photo:
+        from app.media import PhotoError, save_photo
+
+        try:
+            media_token, media_content_type = save_photo(photo)
+        except PhotoError as exc:
+            raise MessagingError(str(exc)) from None
     shop = db.get(Shop, ro.shop_id)
     shop_settings = settings_for(db, ro.shop_id)
     message = Message(
@@ -297,6 +318,8 @@ def send_manual_text(db: Session, ro: RepairOrder, body: str, user_id: int, now:
         body=finish_text(db, shop, ro.customer.phone_e164, body),
         scheduled_send_at=now,
         created_by_user_id=user_id,
+        media_token=media_token,
+        media_content_type=media_content_type,
     )
     db.add(message)
     db.flush()

@@ -41,6 +41,7 @@
         {% for item in thread %}
         {% set m = item.m %}
         <div class="msg {{ 'inbound' if m.direction == 'INBOUND' else 'outbound' }}" data-message-id="{{ m.id }}" data-status="{{ m.status }}">
+          {% if m.media_token %}<a href="/media/{{ m.media_token }}" target="_blank" rel="noopener"><img class="msg-photo" src="/media/{{ m.media_token }}" alt="Photo sent with this text"></a>{% endif %}
           {{ m.body }}
           <small>
             {% if m.status == 'SCHEDULED' %}Scheduled for {{ item.scheduled_for }}{% else %}{{ m.status }} · {{ item.time }}{% endif %}
@@ -63,13 +64,16 @@
         {% endfor %}
       </div>
 
-      <form hx-post="/ro/{{ ro.id }}/messages" hx-target="#messages-panel" hx-swap="outerHTML" method="post" action="/ro/{{ ro.id }}/messages">
+      <form hx-post="/ro/{{ ro.id }}/messages" hx-target="#messages-panel" hx-swap="outerHTML" hx-encoding="multipart/form-data" method="post" action="/ro/{{ ro.id }}/messages" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <label>Send a text
           <textarea name="body" maxlength="320" rows="3" required
                     oninput="this.form.querySelector('.char-count').textContent = this.value.length + ' / 320';"></textarea>
         </label>
         <small class="char-count">0 / 320</small>
+        <label>Photo (optional: JPEG, PNG or GIF up to 5 MB, sent as a picture message)
+          <input type="file" name="photo" accept="image/jpeg,image/png,image/gif">
+        </label>
         <button type="submit">Send</button>
       </form>
 

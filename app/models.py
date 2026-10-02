@@ -256,6 +256,9 @@ class Message(TimestampMixin, Base):
     provider_message_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     error_text: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # Section 16 item 5: 1 photo sent as a picture message. The file lives in ./media/<token>.<ext>.
+    media_token: Mapped[str | None] = mapped_column(String(40), nullable=True, unique=True, index=True)
+    media_content_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 
 class Supplement(TimestampMixin, Base):

@@ -1,6 +1,6 @@
 """Delete a customer's personal data on request (Section 16 item 2).
 
-Personal data goes: name, phone, email, consent history, message text, VIN and claim number.
+Personal data goes: name, phone, email, consent history, message text and photos, VIN and claim number.
 What stays: the repair orders themselves (vehicle year, make and model, amounts, stages and dates),
 so the shop's reports and cycle times stay correct.
 """
@@ -11,6 +11,7 @@ from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
 from app.enums import MessageStatus
+from app.media import delete_photo
 from app.models import Consent, Customer, Message, RepairOrder
 
 DELETED_NAME = "Deleted"
@@ -39,6 +40,7 @@ def anonymize_customer(db: Session, customer: Customer, now: dt.datetime) -> dic
     cancelled = 0
     for message in messages:
         message.body = REMOVED_BODY
+        delete_photo(message)
         if message.to_e164 == phone:
             message.to_e164 = placeholder
         if message.from_e164 == phone:

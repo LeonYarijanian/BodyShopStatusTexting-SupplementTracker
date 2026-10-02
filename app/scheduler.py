@@ -12,9 +12,10 @@ log = logging.getLogger(__name__)
 def run_job(session_factory) -> None:
     from app.csv_import import delete_old_uploads
     from app.digest import run_digests
+    from app.media import delete_old_media
     from app.messaging.engine import run_sender
 
-    for name, step in (("Sender", run_sender), ("Digest", run_digests)):
+    for name, step in (("Sender", run_sender), ("Digest", run_digests), ("Photo cleanup", delete_old_media)):
         db = session_factory()
         try:
             step(utcnow(), db)

@@ -107,8 +107,14 @@ async def send_text_route(ro_id: int, request: Request, current: CurrentUser = D
     ro = get_owned(db, RepairOrder, ro_id, current.shop_id)
     form = await request.form()
     error = None
+    photo = None
+    upload = form.get("photo")
+    if upload is not None and hasattr(upload, "read") and getattr(upload, "filename", ""):
+        from app.media import MAX_PHOTO_BYTES
+
+        photo = await upload.read(MAX_PHOTO_BYTES + 1)
     try:
-        send_manual_text(db, ro, form.get("body") or "", current.id, utcnow(), request.app.state.settings)
+        send_manual_text(db, ro, form.get("body") or "", current.id, utcnow(), request.app.state.settings, photo=photo)
         db.commit()
     except MessagingError as exc:
         db.rollback()
