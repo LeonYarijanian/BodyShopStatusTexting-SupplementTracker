@@ -137,6 +137,7 @@ class Customer(TimestampMixin, Base):
     last_name: Mapped[str | None] = mapped_column(String(60), nullable=True)
     phone_e164: Mapped[str] = mapped_column(String(16), nullable=False)
     email: Mapped[str | None] = mapped_column(String(254), nullable=True)
+    anonymized_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class Insurer(TimestampMixin, Base):

@@ -7,7 +7,7 @@
 </header>
 <table class="compact">
   <tbody>
-    <tr><th>Customer</th><td>{{ customer.first_name }} {{ customer.last_name or '' }} · {{ customer.phone_e164 }}</td>
+    <tr><th>Customer</th><td>{% if customer.anonymized_at %}<em>Customer data deleted {{ customer.anonymized_at|local_dt(tz, "%Y-%m-%d") }} at their request</em>{% else %}{{ customer.first_name }} {{ customer.last_name or '' }} · {{ customer.phone_e164 }}{% endif %}</td>
         <th>Current stage</th><td><strong>{{ STAGE_LABELS[ro.current_stage] }}</strong></td></tr>
     <tr><th>Payer</th><td>{{ payer }}</td>
         <th>Days in shop</th><td>{{ days_in_shop }}d</td></tr>
@@ -33,7 +33,11 @@
   </form>
 </section>
 
+{% if customer.anonymized_at %}
+<article><p>Texting is off for this RO because the customer's personal data was deleted at their request.</p></article>
+{% else %}
 {% include "_ro_messages.html" %}
+{% endif %}
 
 {% if show_supplements %}{% include "_ro_supplements.html" %}{% endif %}
 
@@ -49,4 +53,17 @@
     </tbody>
   </table>
 </section>
+{% if current.is_admin and not customer.anonymized_at %}
+<section>
+  <details>
+    <summary>Delete this customer's personal data</summary>
+    <p>Use this when a customer asks you to delete their data. Their name, phone, email, consent history, message text, VIN and claim numbers are removed from every RO they have. The ROs stay (vehicle, amounts, stages and dates) so your reports stay correct. Texting stops for good. This cannot be undone.</p>
+    <form method="post" action="/customers/{{ customer.id }}/anonymize">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Type DELETE to confirm<input name="confirm" autocomplete="off" required></label>
+      <button type="submit" class="contrast">Delete customer data</button>
+    </form>
+  </details>
+</section>
+{% endif %}
 {% endblock %}

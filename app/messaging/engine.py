@@ -126,6 +126,8 @@ def maybe_schedule_stage_text(db: Session, ro: RepairOrder, stage: Stage, now: d
     shop_settings = settings_for(db, ro.shop_id)
     if stage == Stage.CANCELLED or not (shop_settings.stage_text_enabled or {}).get(stage.value, False):
         return None
+    if ro.customer.anonymized_at is not None:
+        return None
     reached = db.scalar(
         select(func.count(StageEvent.id)).where(StageEvent.repair_order_id == ro.id, StageEvent.to_stage == stage)
     )
@@ -277,6 +279,8 @@ def send_manual_text(db: Session, ro: RepairOrder, body: str, user_id: int, now:
     and rendering rules 2 and 3.
     """
     body = (body or "").strip()
+    if ro.customer.anonymized_at is not None:
+        raise MessagingError("This customer's data was deleted at their request, so texting is off.")
     if not 1 <= len(body) <= MAX_TEXT_LENGTH:
         raise MessagingError(f"A text must be 1 to {MAX_TEXT_LENGTH} characters.")
     shop = db.get(Shop, ro.shop_id)

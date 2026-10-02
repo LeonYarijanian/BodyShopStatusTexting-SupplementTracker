@@ -46,6 +46,10 @@ docker compose exec -T db pg_restore --clean --if-exists --no-owner -U bodyshop 
 
 To run the app against any Postgres without Docker, set `DATABASE_URL=postgresql+psycopg://user:password@host:5432/dbname` and run `alembic upgrade head`. To run the whole test suite against Postgres, set `TEST_POSTGRES_URL=postgresql+psycopg://user@host:5432/postgres` (each test gets its own database).
 
+## Deleting a customer's data
+
+When a customer asks you to delete their data, an admin opens one of their ROs and uses **Delete this customer's personal data** at the bottom of the page (type `DELETE` to confirm). This removes their name, phone, email, consent history, message text, VIN and claim numbers from every RO they have, and cancels any scheduled text. The ROs themselves stay (vehicle, amounts, stages and dates) so reports and cycle times stay correct. It cannot be undone. If the same person comes back later, they are a new customer and must give consent again.
+
 ## Pitch demo
 
 After `alembic upgrade head` and `python -m app.seed --demo`, log in as `admin@demo.local` with password `demo-password-123` and follow the 7-step walkthrough in SPEC.md Section 14. Everything works offline: HTMX and Pico.css are vendored in `app/static/`.

@@ -132,11 +132,16 @@ def validate_ro_form(db: Session, current: CurrentUser, form, now: dt.datetime, 
     shop_id = current.shop_id
     errors: dict[str, str] = {}
     clean: dict = {}
+    # Editing an RO whose customer data was deleted: leave the customer as it is.
+    clean["keep_customer"] = ro is not None and ro.customer.anonymized_at is not None and _text(form, "phone") == ro.customer.phone_e164
 
-    try:
-        clean["phone_e164"] = parse_us_phone(_text(form, "phone"))
-    except ValueError:
-        errors["phone"] = "Enter a valid US phone number."
+    if clean["keep_customer"]:
+        clean["phone_e164"] = ro.customer.phone_e164
+    else:
+        try:
+            clean["phone_e164"] = parse_us_phone(_text(form, "phone"))
+        except ValueError:
+            errors["phone"] = "Enter a valid US phone number."
 
     def required(name: str, label: str, max_len: int) -> None:
         value = _text(form, name)
@@ -152,6 +157,8 @@ def validate_ro_form(db: Session, current: CurrentUser, form, now: dt.datetime, 
             errors[name] = f"{label} must be at most {max_len} characters."
         clean[name] = value or None
 
+    if clean["keep_customer"]:
+        form = {**dict(form), "first_name": ro.customer.first_name}
     required("first_name", "First name", 60)
     optional("last_name", "Last name", 60)
     optional("email", "Email", 254)
@@ -309,10 +316,11 @@ def create_repair_order(db: Session, current: CurrentUser, clean: dict, now: dt.
 
 
 def update_repair_order(db: Session, current: CurrentUser, ro: RepairOrder, clean: dict) -> RepairOrder:
-    customer = find_or_create_customer(
-        db, current.shop_id, clean["phone_e164"], clean["first_name"], clean["last_name"], clean["email"]
-    )
-    ro.customer_id = customer.id
+    if not clean.get("keep_customer"):
+        customer = find_or_create_customer(
+            db, current.shop_id, clean["phone_e164"], clean["first_name"], clean["last_name"], clean["email"]
+        )
+        ro.customer_id = customer.id
     for field in (
         "ro_number",
         "vehicle_year",

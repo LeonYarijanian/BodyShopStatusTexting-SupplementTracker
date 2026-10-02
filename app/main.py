@@ -19,6 +19,7 @@ from app.routes import (
     board,
     import_routes,
     messages_routes,
+    privacy_routes,
     repair_orders,
     reports_routes,
     settings_routes,
@@ -75,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         reports_routes,
         settings_routes,
         import_routes,
+        privacy_routes,
         webhooks,
     ):
         app.include_router(module.router)
