@@ -42,7 +42,7 @@
         <td><input type="checkbox" name="enabled_{{ row.stage.value }}" value="yes"{% if row.enabled %} checked{% endif %} aria-label="Text on {{ row.label }}"></td>
         <td>
           <textarea name="template_{{ row.stage.value }}" rows="2" maxlength="250"
-                    hx-post="/settings/preview" hx-trigger="keyup changed delay:300ms" hx-target="#preview-{{ row.stage.value }}"
+                    hx-post="/settings/preview" hx-trigger="input changed delay:300ms" hx-target="#preview-{{ row.stage.value }}"
                     hx-vals='{"stage": "{{ row.stage.value }}"}'>{{ row.template }}</textarea>
           <div class="preview" id="preview-{{ row.stage.value }}">{{ row.preview }}</div>
         </td>
