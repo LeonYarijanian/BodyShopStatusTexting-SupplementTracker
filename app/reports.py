@@ -11,6 +11,7 @@ from app.business_days import business_days_between, local_datetime_at, to_local
 from app.enums import (
     AgingBucket,
     ConsentMethod,
+    ConsentPurpose,
     ConsentStatus,
     MessageDirection,
     MessageKind,
@@ -260,6 +261,7 @@ def report_texting(db: Session, shop_id: int, start: dt.datetime, end: dt.dateti
             Consent.shop_id == shop_id,
             Consent.status == ConsentStatus.OPTED_OUT,
             Consent.method == ConsentMethod.KEYWORD,
+            Consent.purpose == ConsentPurpose.REPAIR_UPDATES,
             Consent.recorded_at >= start,
             Consent.recorded_at < end,
         )

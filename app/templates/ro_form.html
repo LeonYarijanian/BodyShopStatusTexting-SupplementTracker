@@ -112,6 +112,10 @@
       </select>
       {% if errors.consent_method %}<small class="error">{{ errors.consent_method }}</small>{% endif %}
     </label>
+    {% if review_requests_on %}
+    <blockquote>{{ review_consent_script }}</blockquote>
+    <label><input type="checkbox" name="review_consent" value="yes"{% if values.review_consent %} checked{% endif %}> The customer also said yes to 1 review request after pickup</label>
+    {% endif %}
   </fieldset>
   {% endif %}
 

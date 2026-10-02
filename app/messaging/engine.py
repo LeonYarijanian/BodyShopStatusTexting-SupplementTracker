@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.business_days import local_datetime_at, to_local
 from app.config import Settings, get_settings
 from app.enums import (
+    ConsentPurpose,
     ConsentStatus,
     MessageDirection,
     MessageKind,
@@ -40,19 +41,23 @@ class MessagingError(ValueError):
 # ---------------------------------------------------------------- lookups
 
 
-def current_consent(db: Session, shop_id: int, phone_e164: str) -> Consent | None:
-    """The row with the latest recorded_at for (shop_id, phone_e164); ties go to the highest id."""
+def current_consent(db: Session, shop_id: int, phone_e164: str, purpose: ConsentPurpose = ConsentPurpose.REPAIR_UPDATES) -> Consent | None:
+    """The row with the latest recorded_at for (shop_id, phone_e164) and this purpose; ties go to the highest id."""
     return db.scalar(
         select(Consent)
-        .where(Consent.shop_id == shop_id, Consent.phone_e164 == phone_e164)
+        .where(Consent.shop_id == shop_id, Consent.phone_e164 == phone_e164, Consent.purpose == purpose)
         .order_by(Consent.recorded_at.desc(), Consent.id.desc())
         .limit(1)
     )
 
 
 def consent_statuses(db: Session, shop_id: int) -> dict[str, ConsentStatus]:
-    """Current consent status for every phone in a shop that has any consent row."""
-    rows = db.scalars(select(Consent).where(Consent.shop_id == shop_id).order_by(Consent.recorded_at, Consent.id)).all()
+    """Current repair-update consent status for every phone in a shop that has any consent row."""
+    rows = db.scalars(
+        select(Consent)
+        .where(Consent.shop_id == shop_id, Consent.purpose == ConsentPurpose.REPAIR_UPDATES)
+        .order_by(Consent.recorded_at, Consent.id)
+    ).all()
     return {row.phone_e164: row.status for row in rows}
 
 
@@ -99,7 +104,8 @@ def ro_variables(shop: Shop, shop_settings: ShopSettings, ro: RepairOrder) -> di
         shop_phone_e164=shop.phone_e164,
         vehicle=ro.vehicle,
         ro_number=ro.ro_number,
-        review_url=shop_settings.review_url,
+        # With review requests on, repair updates stay informational: the review link goes only in the review request.
+        review_url="" if shop_settings.review_request_enabled else shop_settings.review_url,
     )
 
 
@@ -231,7 +237,8 @@ def process_message(db: Session, message: Message, now: dt.datetime, app_setting
     skip_checks = message.kind in KEYWORD_REPLY_KINDS
 
     if not skip_checks:
-        consent = current_consent(db, message.shop_id, message.to_e164)
+        purpose = ConsentPurpose.REVIEW_REQUESTS if message.kind == MessageKind.REVIEW_REQUEST else ConsentPurpose.REPAIR_UPDATES
+        consent = current_consent(db, message.shop_id, message.to_e164, purpose)
         if consent is None:
             message.status = MessageStatus.BLOCKED_NO_CONSENT
             return
@@ -244,6 +251,14 @@ def process_message(db: Session, message: Message, now: dt.datetime, app_setting
             local_time = local_now.time()
             if not (shop_settings.quiet_end <= local_time < shop_settings.quiet_start):
                 message.scheduled_send_at = _next_quiet_end(local_now, shop_settings.quiet_end, tz, next_day=local_time >= shop_settings.quiet_end)
+                return
+
+        if message.kind == MessageKind.REVIEW_REQUEST:
+            from app.messaging.reviews import already_asked
+
+            if already_asked(db, message, now):
+                message.status = MessageStatus.CANCELLED_SUPERSEDED
+                message.error_text = "ALREADY_ASKED"
                 return
 
         if message.kind == MessageKind.STAGE_UPDATE:

@@ -21,9 +21,10 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
 
 from app.business_days import UTC, utcnow
-from app.messaging.templates import default_stage_templates, default_stage_text_enabled
+from app.messaging.templates import default_review_request_template, default_stage_templates, default_stage_text_enabled
 from app.enums import (
     ConsentMethod,
+    ConsentPurpose,
     ConsentStatus,
     FollowUpMethod,
     MessageDirection,
@@ -111,6 +112,10 @@ class ShopSettings(TimestampMixin, Base):
     digest_recipients: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     digest_send_time: Mapped[dt.time] = mapped_column(Time, nullable=False, default=dt.time(7, 30))
     digest_last_sent_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    # Section 16 item 6: 1 review request text after delivery, with its own consent.
+    review_request_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    review_request_delay_days: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    review_request_template: Mapped[str] = mapped_column(String(250), nullable=False, default=default_review_request_template)
 
     shop: Mapped[Shop] = relationship(back_populates="settings")
 
@@ -233,6 +238,9 @@ class Consent(TimestampMixin, Base):
     phone_e164: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[ConsentStatus] = mapped_column(enum_column(ConsentStatus), nullable=False)
     method: Mapped[ConsentMethod] = mapped_column(enum_column(ConsentMethod), nullable=False)
+    purpose: Mapped[ConsentPurpose] = mapped_column(
+        enum_column(ConsentPurpose), nullable=False, default=ConsentPurpose.REPAIR_UPDATES, server_default=ConsentPurpose.REPAIR_UPDATES.value
+    )
     recorded_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     recorded_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, nullable=False)
 

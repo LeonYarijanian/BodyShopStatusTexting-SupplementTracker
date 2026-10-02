@@ -17,6 +17,7 @@ from app.messaging.templates import (
     PREVIEW_FIRST_NAME,
     PREVIEW_RO_NUMBER,
     PREVIEW_VEHICLE,
+    REVIEW_VARIABLES,
     TEXTABLE_STAGES,
     TemplateError,
     add_identification,
@@ -153,6 +154,20 @@ def save_texting(settings: ShopSettings, form) -> None:
             raise SettingsError(f"{STAGE_LABELS[stage]} template cannot be empty.")
         templates[stage.value] = text
 
+    review_enabled = _checked(form, "review_request_enabled")
+    delay_text = _text(form, "review_request_delay_days") or str(settings.review_request_delay_days)
+    review_delay = parse_int(delay_text, "review_request_delay_days", 1, 14)
+    review_template = form.get("review_request_template")
+    review_template = (review_template if isinstance(review_template, str) else settings.review_request_template).strip()
+    try:
+        validate_template(review_template, REVIEW_VARIABLES)
+    except TemplateError as exc:
+        raise SettingsError(f"Review request template: {exc}") from None
+    if "{review_url}" not in review_template:
+        raise SettingsError("Review request template must include {review_url}.")
+    if review_enabled and not review_url:
+        raise SettingsError("Set the review URL before turning on review requests.")
+
     settings.quiet_start = quiet_start
     settings.quiet_end = quiet_end
     settings.cool_off_minutes = cool_off
@@ -160,6 +175,9 @@ def save_texting(settings: ShopSettings, form) -> None:
     settings.review_url = review_url
     settings.stage_text_enabled = enabled
     settings.stage_templates = templates
+    settings.review_request_enabled = review_enabled
+    settings.review_request_delay_days = review_delay
+    settings.review_request_template = review_template
 
 
 def parse_email_list(text: str, field: str, limit: int) -> list[str]:

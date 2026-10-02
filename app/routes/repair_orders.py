@@ -17,6 +17,7 @@ from app.enums import (
     STAGE_LABELS,
     TERMINAL_STAGES,
     ConsentMethod,
+    ConsentPurpose,
     ConsentStatus,
     MessageDirection,
     PayerType,
@@ -27,7 +28,7 @@ from app.enums import (
 from app.messaging.templates import parse_us_phone
 from app.models import Adjuster, Consent, Customer, Insurer, Message, RepairOrder, StageEvent, Supplement, SupplementEvent, User
 from app.money import dollars_to_cents
-from app.routes import is_htmx, render
+from app.routes import is_htmx, render, shop_settings
 
 router = APIRouter()
 
@@ -36,6 +37,11 @@ CHECKIN_CONSENT_METHODS = (ConsentMethod.IN_PERSON_VERBAL, ConsentMethod.SIGNED_
 CONSENT_SCRIPT = (
     "Can we text you updates about your repair at this number? We'll only send repair updates. "
     "Message and data rates may apply. You can reply STOP anytime to opt out."
+)
+# Section 16 item 6: asked separately, and only when review requests are on.
+REVIEW_CONSENT_SCRIPT = (
+    "After you pick up your car, may we send you one text asking for a review? "
+    "That is the only one we'll send. You can reply STOP anytime."
 )
 
 
@@ -234,8 +240,9 @@ def validate_ro_form(db: Session, current: CurrentUser, form, now: dt.datetime, 
         errors["checked_in_at"] = "Check-in time must be on or before the delivery time."
 
     clean["consent"] = form.get("consent") in ("yes", "on", "true", "1")
+    clean["review_consent"] = form.get("review_consent") in ("yes", "on", "true", "1")
     method = _text(form, "consent_method")
-    if clean["consent"]:
+    if clean["consent"] or clean["review_consent"]:
         if method not in [m.value for m in CHECKIN_CONSENT_METHODS]:
             errors["consent_method"] = "Choose how the customer gave consent."
         else:
@@ -259,13 +266,23 @@ def find_or_create_customer(db: Session, shop_id: int, phone_e164: str, first_na
     return customer
 
 
-def record_consent(db: Session, shop_id: int, customer: Customer, status: ConsentStatus, method: ConsentMethod, user_id: int | None, now: dt.datetime) -> Consent:
+def record_consent(
+    db: Session,
+    shop_id: int,
+    customer: Customer,
+    status: ConsentStatus,
+    method: ConsentMethod,
+    user_id: int | None,
+    now: dt.datetime,
+    purpose: ConsentPurpose = ConsentPurpose.REPAIR_UPDATES,
+) -> Consent:
     consent = Consent(
         shop_id=shop_id,
         customer_id=customer.id,
         phone_e164=customer.phone_e164,
         status=status,
         method=method,
+        purpose=purpose,
         recorded_by_user_id=user_id,
         recorded_at=now,
     )
@@ -300,6 +317,10 @@ def create_repair_order(db: Session, current: CurrentUser, clean: dict, now: dt.
     db.flush()
     if clean.get("consent"):
         record_consent(db, current.shop_id, customer, ConsentStatus.OPTED_IN, clean["consent_method"], current.id, now)
+    if clean.get("review_consent"):
+        record_consent(
+            db, current.shop_id, customer, ConsentStatus.OPTED_IN, clean["consent_method"], current.id, now, ConsentPurpose.REVIEW_REQUESTS
+        )
     db.add(
         StageEvent(
             shop_id=current.shop_id,
@@ -356,6 +377,9 @@ def change_stage(db: Session, ro: RepairOrder, to_stage: Stage, user: User, now:
         ro.delivered_at = now
     elif from_stage in TERMINAL_STAGES:
         ro.delivered_at = None
+        from app.messaging.reviews import cancel_review_request
+
+        cancel_review_request(db, ro)
     ro.current_stage = to_stage
     db.add(
         StageEvent(
@@ -369,6 +393,10 @@ def change_stage(db: Session, ro: RepairOrder, to_stage: Stage, user: User, now:
     )
     db.flush()
     after_stage_change(db, ro, to_stage, now)
+    if to_stage == Stage.DELIVERED:
+        from app.messaging.reviews import schedule_review_request
+
+        schedule_review_request(db, ro, now)
     return True
 
 
@@ -395,6 +423,8 @@ def form_context(db: Session, current: CurrentUser, values: dict, errors: dict, 
         "insurers": insurers_for_shop(db, current.shop_id),
         "adjusters": adjusters_for_insurer(db, current.shop_id, insurer_id),
         "consent_script": CONSENT_SCRIPT,
+        "review_consent_script": REVIEW_CONSENT_SCRIPT,
+        "review_requests_on": shop_settings(db, current.shop_id).review_request_enabled,
         "consent_methods": CHECKIN_CONSENT_METHODS,
     }
 

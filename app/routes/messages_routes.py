@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser, get_db, get_owned, require_user
 from app.business_days import local_datetime_at, to_local, utcnow
-from app.enums import ConsentMethod, ConsentStatus, MessageDirection, MessageStatus, MessagingMode
+from app.enums import ConsentMethod, ConsentPurpose, ConsentStatus, MessageDirection, MessageStatus, MessagingMode
 from app.messaging.engine import (
     MessagingError,
     cancel_message,
@@ -23,7 +23,7 @@ from app.messaging.engine import (
 from app.messaging.inbound import handle_inbound
 from app.models import Message, RepairOrder
 from app.routes import is_htmx, render, topbar
-from app.routes.repair_orders import CHECKIN_CONSENT_METHODS, CONSENT_SCRIPT, record_consent
+from app.routes.repair_orders import CHECKIN_CONSENT_METHODS, CONSENT_SCRIPT, REVIEW_CONSENT_SCRIPT, record_consent
 
 router = APIRouter()
 
@@ -45,10 +45,17 @@ def message_time(message: Message) -> dt.datetime:
     return message.created_at
 
 
+def _scheduled_label(when: dt.datetime, tz: str, today: dt.date) -> str:
+    local = to_local(when, tz)
+    return local.strftime("%H:%M") if local.date() == today else local.strftime("%Y-%m-%d %H:%M")
+
+
 def messages_panel_context(db: Session, current: CurrentUser, ro: RepairOrder) -> dict:
     tz = current.shop.timezone
     shop_settings = settings_for(db, current.shop_id)
     consent = current_consent(db, current.shop_id, ro.customer.phone_e164)
+    review_consent = current_consent(db, current.shop_id, ro.customer.phone_e164, ConsentPurpose.REVIEW_REQUESTS)
+    today = to_local(utcnow(), tz).date()
     messages = db.scalars(select(Message).where(Message.repair_order_id == ro.id).order_by(Message.created_at, Message.id)).all()
     thread = []
     for message in messages:
@@ -57,7 +64,7 @@ def messages_panel_context(db: Session, current: CurrentUser, ro: RepairOrder) -
             {
                 "m": message,
                 "time": when.strftime("%Y-%m-%d %H:%M"),
-                "scheduled_for": to_local(message.scheduled_send_at, tz).strftime("%H:%M") if message.scheduled_send_at else "",
+                "scheduled_for": _scheduled_label(message.scheduled_send_at, tz, today) if message.scheduled_send_at else "",
             }
         )
     return {
@@ -67,6 +74,10 @@ def messages_panel_context(db: Session, current: CurrentUser, ro: RepairOrder) -
         "consent_label": CONSENT_LABELS[consent.status] if consent else "No consent",
         "consent_method_label": METHOD_LABELS.get(consent.method, "") if consent else "",
         "opted_out_by_text": consent is not None and consent.status == ConsentStatus.OPTED_OUT,
+        "review_requests_on": shop_settings.review_request_enabled,
+        "review_consent_label": CONSENT_LABELS[review_consent.status] if review_consent else "No consent",
+        "review_opted_out": review_consent is not None and review_consent.status == ConsentStatus.OPTED_OUT,
+        "review_consent_script": REVIEW_CONSENT_SCRIPT,
         "consent_script": CONSENT_SCRIPT,
         "consent_methods": CHECKIN_CONSENT_METHODS,
         "is_demo": shop_settings.messaging_mode == MessagingMode.DEMO,
@@ -89,15 +100,25 @@ async def record_consent_route(ro_id: int, request: Request, current: CurrentUse
     ro = get_owned(db, RepairOrder, ro_id, current.shop_id)
     form = await request.form()
     method = (form.get("consent_method") or "").strip()
+    purpose_text = (form.get("purpose") or ConsentPurpose.REPAIR_UPDATES.value).strip()
     now = utcnow()
-    consent = current_consent(db, current.shop_id, ro.customer.phone_e164)
     error = None
-    if consent is not None and consent.status == ConsentStatus.OPTED_OUT:
+    if purpose_text not in ConsentPurpose.__members__:
+        error = "Unknown consent type."
+        purpose = ConsentPurpose.REPAIR_UPDATES
+    else:
+        purpose = ConsentPurpose(purpose_text)
+    consent = current_consent(db, current.shop_id, ro.customer.phone_e164, purpose)
+    if error:
+        pass
+    elif ro.customer.anonymized_at is not None:
+        error = "This customer's data was deleted at their request."
+    elif consent is not None and consent.status == ConsentStatus.OPTED_OUT:
         error = "Customer opted out by text. They must text START to resubscribe."
     elif method not in [m.value for m in CHECKIN_CONSENT_METHODS]:
         error = "Choose how the customer gave consent."
     else:
-        record_consent(db, current.shop_id, ro.customer, ConsentStatus.OPTED_IN, ConsentMethod(method), current.id, now)
+        record_consent(db, current.shop_id, ro.customer, ConsentStatus.OPTED_IN, ConsentMethod(method), current.id, now, purpose)
         db.commit()
     return _panel_response(request, db, current, ro, error)
 

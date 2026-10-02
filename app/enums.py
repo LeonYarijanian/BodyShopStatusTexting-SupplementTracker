@@ -35,6 +35,13 @@ class ConsentStatus(StrEnum):
     OPTED_OUT = "OPTED_OUT"
 
 
+class ConsentPurpose(StrEnum):
+    """Section 16 item 6: review requests need their own consent, separate from repair updates."""
+
+    REPAIR_UPDATES = "REPAIR_UPDATES"
+    REVIEW_REQUESTS = "REVIEW_REQUESTS"
+
+
 class ConsentMethod(StrEnum):
     IN_PERSON_VERBAL = "IN_PERSON_VERBAL"
     SIGNED_FORM = "SIGNED_FORM"
@@ -55,6 +62,7 @@ class MessageKind(StrEnum):
     HELP_REPLY = "HELP_REPLY"
     INBOUND_REPLY = "INBOUND_REPLY"
     INBOUND_KEYWORD = "INBOUND_KEYWORD"
+    REVIEW_REQUEST = "REVIEW_REQUEST"
 
 
 class MessageStatus(StrEnum):

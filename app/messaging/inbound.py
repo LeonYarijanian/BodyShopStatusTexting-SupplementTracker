@@ -9,6 +9,7 @@ from app.config import Settings, get_settings
 from app.enums import (
     ACTIVE_STAGES,
     ConsentMethod,
+    ConsentPurpose,
     ConsentStatus,
     MessageDirection,
     MessageKind,
@@ -114,17 +115,20 @@ def handle_inbound(
 
     if keyword in OPT_OUT_WORDS:
         if customer is not None:
-            db.add(
-                Consent(
-                    shop_id=shop.id,
-                    customer_id=customer.id,
-                    phone_e164=from_e164,
-                    status=ConsentStatus.OPTED_OUT,
-                    method=ConsentMethod.KEYWORD,
-                    recorded_by_user_id=None,
-                    recorded_at=now,
+            # STOP covers every kind of text: repair updates and review requests.
+            for purpose in ConsentPurpose:
+                db.add(
+                    Consent(
+                        shop_id=shop.id,
+                        customer_id=customer.id,
+                        phone_e164=from_e164,
+                        status=ConsentStatus.OPTED_OUT,
+                        method=ConsentMethod.KEYWORD,
+                        purpose=purpose,
+                        recorded_by_user_id=None,
+                        recorded_at=now,
+                    )
                 )
-            )
         for scheduled in db.scalars(
             select(Message).where(
                 Message.shop_id == shop.id,

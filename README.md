@@ -68,6 +68,10 @@ Once you have Secure Share developer access or a CIECA BMS sample set from a pil
 
 The RO page's **Send a text** box takes an optional photo (JPEG, PNG or GIF up to 5 MB), sent as a picture message with the text as its caption. Picture messages cost more per text than plain texts. Photos are stored in `./media/` (the `media` volume when hosted) under a long random name, which is the public URL Twilio fetches when sending. They are deleted 30 days after the text, and right away when the customer's data is deleted. This replaces the v1 rule of never storing photos.
 
+## Review requests
+
+Settings > Texting > **Review request after delivery** (off by default) sends 1 text asking for a review, at 10:00 a chosen number of days (1 to 14) after an RO is delivered. It has its own consent: the check-in form and the RO page ask separately, and repair-update consent alone is not enough. While it is on, the Delivered text leaves out the review link so repair updates stay informational. Each RO gets at most 1 request, a phone is never asked twice within 365 days, reopening the RO cancels a request that hasn't gone out, and STOP covers it. START turns repair updates back on but not review requests.
+
 ## Pitch demo
 
 After `alembic upgrade head` and `python -m app.seed --demo`, log in as `admin@demo.local` with password `demo-password-123` and follow the 7-step walkthrough in SPEC.md Section 14. Everything works offline: HTMX and Pico.css are vendored in `app/static/`.

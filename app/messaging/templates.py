@@ -65,6 +65,18 @@ PREVIEW_RO_NUMBER = "24-1187"
 _VARIABLE_RE = re.compile(r"\{([^{}]*)\}")
 
 
+# Section 16 item 6: the only text that asks for a review. It goes out once, days after delivery.
+DEFAULT_REVIEW_REQUEST_TEMPLATE = (
+    "{shop_name}: Thanks again for trusting us with your {vehicle}, {first_name}. "
+    "If you have a minute, a review helps us a lot: {review_url} Reply STOP to opt out."
+)
+REVIEW_VARIABLES = ("first_name", "shop_name", "vehicle", "review_url")
+
+
+def default_review_request_template() -> str:
+    return DEFAULT_REVIEW_REQUEST_TEMPLATE
+
+
 def default_stage_text_enabled() -> dict[str, bool]:
     return {stage.value: enabled for stage, enabled in DEFAULT_TEXT_ENABLED.items()}
 
@@ -77,10 +89,10 @@ class TemplateError(ValueError):
     pass
 
 
-def validate_template(text: str) -> None:
+def validate_template(text: str, known: tuple[str, ...] = KNOWN_VARIABLES) -> None:
     """Rendering rules 1 and 5, checked when a template is saved."""
     for match in _VARIABLE_RE.finditer(text):
-        if match.group(1) not in KNOWN_VARIABLES:
+        if match.group(1) not in known:
             raise TemplateError(f"Unknown variable {{{match.group(1)}}}")
     if len(text) > MAX_TEMPLATE_LENGTH:
         raise TemplateError(f"Template is longer than {MAX_TEMPLATE_LENGTH} characters ({len(text)}).")

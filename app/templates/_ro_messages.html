@@ -26,6 +26,28 @@
       </details>
       {% endif %}
 
+      {% if review_requests_on %}
+      <p>Review request: <strong>{{ review_consent_label }}</strong></p>
+      {% if review_consent_label != "Opted in" and not review_opted_out %}
+      <details>
+        <summary role="button" class="secondary outline">Record review consent</summary>
+        <form hx-post="/ro/{{ ro.id }}/consent" hx-target="#messages-panel" hx-swap="outerHTML" method="post" action="/ro/{{ ro.id }}/consent">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="purpose" value="REVIEW_REQUESTS">
+          <blockquote>{{ review_consent_script }}</blockquote>
+          <label>Method
+            <select name="consent_method" required>
+              <option value="">Choose…</option>
+              <option value="IN_PERSON_VERBAL">In person (verbal)</option>
+              <option value="SIGNED_FORM">Signed form</option>
+            </select>
+          </label>
+          <button type="submit">Customer said yes</button>
+        </form>
+      </details>
+      {% endif %}
+      {% endif %}
+
       {% if ro.needs_reply %}
       <form hx-post="/ro/{{ ro.id }}/mark-handled" hx-target="#messages-panel" hx-swap="outerHTML" method="post" action="/ro/{{ ro.id }}/mark-handled">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

@@ -51,6 +51,13 @@
       <tr><td>Cancelled</td><td>Never</td><td>None</td></tr>
     </tbody>
   </table>
+  <fieldset>
+    <legend><strong>Review request after delivery</strong></legend>
+    <p><small>1 text asking for a review, sent at 10:00 the chosen number of days after delivery, only to customers who said yes to review requests separately. While this is on, the Delivered text leaves out the review link. Variables: {first_name} {shop_name} {vehicle} {review_url}.</small></p>
+    <label><input type="checkbox" name="review_request_enabled" value="yes"{% if settings.review_request_enabled %} checked{% endif %}> Send review requests (needs the review URL above)</label>
+    <label>Days after delivery (1 to 14)<input name="review_request_delay_days" type="number" value="{{ settings.review_request_delay_days }}"></label>
+    <label>Template<textarea name="review_request_template" rows="2" maxlength="250">{{ settings.review_request_template }}</textarea></label>
+  </fieldset>
   <button type="submit">Save</button>
 </form>
 
