@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.business_days import local_to_utc, utcnow
 from app.enums import ConsentMethod, ConsentStatus, PayerType, Stage
 from app.messaging.templates import parse_us_phone
-from app.models import Adjuster, Consent, Customer, Insurer, RepairOrder, Shop, StageEvent, User
+from app.models import Adjuster, Consent, Customer, Insurer, Location, RepairOrder, Shop, StageEvent, User
 from app.money import dollars_to_cents
 from app.routes.repair_orders import ROError, validate_vehicle_year, validate_vin
 from app.status_page import ensure_status_token
@@ -45,6 +45,7 @@ COLUMNS = (
     "original_estimate",
     "stage",
     "consent",
+    "location",  # optional (Section 16 item 9): a location name; empty puts the RO at the importer's location
 )
 REQUIRED_COLUMNS = (
     "ro_number",
@@ -256,6 +257,17 @@ def validate_row(db: Session, shop: Shop, row_number: int, values: dict, create_
     if consent_text not in ("YES", "NO"):
         errors.append("consent: must be YES or NO.")
     clean["consent"] = consent_text == "YES"
+
+    clean["location_id"] = None
+    location_name = values.get("location", "")
+    if location_name:
+        location = db.scalar(
+            select(Location).where(Location.shop_id == shop.id, Location.is_active.is_(True), func.lower(Location.name) == location_name.lower())
+        )
+        if location is None:
+            errors.append(f"location: {location_name} is not one of this shop's active locations.")
+        else:
+            clean["location_id"] = location.id
     return result
 
 
@@ -269,13 +281,19 @@ def dry_run(db: Session, shop: Shop, data: bytes, create_missing_insurers: bool,
 # ---------------------------------------------------------------- commit
 
 
-def commit_import(db: Session, shop: Shop, user: User, data: bytes, create_missing_insurers: bool, now: dt.datetime) -> int:
-    """Save every row in 1 transaction. Raises ImportFileError if the dry run has any error."""
+def commit_import(
+    db: Session, shop: Shop, user: User, data: bytes, create_missing_insurers: bool, now: dt.datetime, default_location_id: int | None = None
+) -> int:
+    """Save every row in 1 transaction. Raises ImportFileError if the dry run has any error.
+
+    Rows with an empty location go to `default_location_id` (the importer's location).
+    """
     results = dry_run(db, shop, data, create_missing_insurers, now)
     if any(not r.ok for r in results):
         raise ImportFileError("The file has errors. Fix them and upload it again.")
     try:
         for result in results:
+            result.clean["location_id"] = result.clean.get("location_id") or default_location_id
             _save_row(db, shop, user, result.clean, now)
         db.commit()
     except Exception:
@@ -325,6 +343,7 @@ def _save_row(db: Session, shop: Shop, user: User, clean: dict, now: dt.datetime
         original_estimate_cents=clean["original_estimate_cents"],
         current_stage=clean["stage"],
         checked_in_at=clean["checked_in_at"],
+        location_id=clean.get("location_id"),
     )
     ensure_status_token(ro)
     db.add(ro)

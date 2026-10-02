@@ -118,11 +118,24 @@ def get_db(request: Request):
 
 
 class CurrentUser:
-    """The logged-in user plus their shop. Every query filters by `shop_id`."""
+    """The logged-in user plus their shop. Every query filters by `shop_id`.
 
-    def __init__(self, user: User, shop: Shop):
+    `locations` are the shop's active locations and `location_id` the one the switcher shows (None = all).
+    """
+
+    def __init__(self, user: User, shop: Shop, locations: list | None = None, location_id: int | None = None):
         self.user = user
         self.shop = shop
+        self.locations = locations or []
+        self.location_id = location_id
+
+    @property
+    def multi_location(self) -> bool:
+        return len(self.locations) >= 2
+
+    @property
+    def location(self):
+        return next((location for location in self.locations if location.id == self.location_id), None)
 
     @property
     def id(self) -> int:
@@ -150,7 +163,11 @@ def require_user(request: Request, db: Session = Depends(get_db)) -> CurrentUser
         raise LoginRequired()
     request.session["last_seen"] = now.timestamp()
     shop = db.get(Shop, user.shop_id)
-    return CurrentUser(user, shop)
+    from app.locations import active_location_id, shop_locations
+
+    locations = shop_locations(db, shop.id)
+    location_id = active_location_id(request.session.get("location_id"), user.location_id, locations)
+    return CurrentUser(user, shop, locations, location_id)
 
 
 def require_admin(current: CurrentUser = Depends(require_user)) -> CurrentUser:

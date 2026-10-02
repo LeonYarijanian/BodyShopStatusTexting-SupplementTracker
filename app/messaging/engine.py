@@ -25,7 +25,8 @@ from app.messaging.templates import (
     replace_variables,
     template_variables,
 )
-from app.models import Consent, Customer, Message, RepairOrder, Shop, ShopSettings, StageEvent
+from app.locations import phone_for, review_url_for
+from app.models import Consent, Customer, Location, Message, RepairOrder, Shop, ShopSettings, StageEvent
 from app.status_page import ensure_status_token, status_url
 
 SENT_OK = (MessageStatus.SENT, MessageStatus.DELIVERED)
@@ -66,11 +67,24 @@ def settings_for(db: Session, shop_id: int) -> ShopSettings:
     return db.scalar(select(ShopSettings).where(ShopSettings.shop_id == shop_id))
 
 
-def sender_number(shop: Shop, shop_settings: ShopSettings) -> str:
-    """Shop phone in DEMO mode, the Twilio number in LIVE mode."""
-    if shop_settings.messaging_mode == MessagingMode.LIVE and shop_settings.twilio_from_e164:
-        return shop_settings.twilio_from_e164
-    return shop.phone_e164
+def sender_number(shop: Shop, shop_settings: ShopSettings, location: Location | None = None) -> str:
+    """Shop phone in DEMO mode, the Twilio number in LIVE mode.
+
+    With a location (Section 16 item 9): its phone in DEMO mode, and its own Twilio number in LIVE mode
+    when it has one (else the shop's Twilio number).
+    """
+    if shop_settings.messaging_mode == MessagingMode.LIVE:
+        number = (location.twilio_from_e164 if location is not None else "") or shop_settings.twilio_from_e164
+        if number:
+            return number
+    return location.phone_e164 if location is not None else shop.phone_e164
+
+
+def location_of_message(db: Session, message: Message) -> Location | None:
+    if message.repair_order_id is None:
+        return None
+    ro = db.get(RepairOrder, message.repair_order_id)
+    return ro.location if ro is not None else None
 
 
 def has_successful_outbound(db: Session, shop_id: int, phone_e164: str) -> bool:
@@ -102,11 +116,11 @@ def ro_variables(shop: Shop, shop_settings: ShopSettings, ro: RepairOrder) -> di
     return template_variables(
         first_name=ro.customer.first_name,
         shop_name=shop.name,
-        shop_phone_e164=shop.phone_e164,
+        shop_phone_e164=phone_for(shop, ro.location),
         vehicle=ro.vehicle,
         ro_number=ro.ro_number,
         # With review requests on, repair updates stay informational: the review link goes only in the review request.
-        review_url="" if shop_settings.review_request_enabled else shop_settings.review_url,
+        review_url="" if shop_settings.review_request_enabled else review_url_for(shop_settings, ro.location),
         status_link=status_url(ensure_status_token(ro)),
     )
 
@@ -167,7 +181,7 @@ def schedule_stage_text(db: Session, ro: RepairOrder, stage: Stage, now: dt.date
         kind=MessageKind.STAGE_UPDATE,
         status=MessageStatus.SCHEDULED,
         to_e164=ro.customer.phone_e164,
-        from_e164=sender_number(shop, shop_settings),
+        from_e164=sender_number(shop, shop_settings, ro.location),
         body=render_stage_text(db, shop, shop_settings, ro, template),
         stage=stage,
         scheduled_send_at=now + dt.timedelta(minutes=shop_settings.cool_off_minutes),
@@ -206,15 +220,23 @@ def sent_today_count(db: Session, shop_id: int, phone_e164: str, now: dt.datetim
     )
 
 
-def deliver(db: Session, message: Message, shop: Shop, shop_settings: ShopSettings, now: dt.datetime, app_settings: Settings) -> None:
-    """Checks 4 and 5: length, then send through the active provider."""
+def deliver(
+    db: Session, message: Message, shop: Shop, shop_settings: ShopSettings, now: dt.datetime, app_settings: Settings, location: Location | None = None
+) -> None:
+    """Checks 4 and 5: length, then send through the active provider.
+
+    The text goes out from its RO's location (or `location`, for a reply to a text sent to that location).
+    """
     if len(message.body) > MAX_TEXT_LENGTH:
         message.status = MessageStatus.FAILED
         message.error_text = BODY_TOO_LONG
         return
-    message.from_e164 = sender_number(shop, shop_settings)
+    location = location or location_of_message(db, message)
+    message.from_e164 = sender_number(shop, shop_settings, location)
     provider = get_provider(shop_settings, app_settings)
     extra = {}
+    if location is not None and location.twilio_from_e164:
+        extra["location_number"] = location.twilio_from_e164
     if message.media_token:
         from app.media import public_media_url
 
@@ -331,7 +353,7 @@ def send_manual_text(
         kind=MessageKind.MANUAL,
         status=MessageStatus.SCHEDULED,
         to_e164=ro.customer.phone_e164,
-        from_e164=sender_number(shop, shop_settings),
+        from_e164=sender_number(shop, shop_settings, ro.location),
         body=finish_text(db, shop, ro.customer.phone_e164, body),
         scheduled_send_at=now,
         created_by_user_id=user_id,

@@ -13,6 +13,7 @@
           {% if card.ro.needs_reply %}<span class="tag tag-reply">Needs reply</span>{% endif %}
           {% if card.no_texts %}<span class="tag tag-notexts">No texts</span>{% endif %}
           {% if card.supplement_days is not none %}<span class="tag bucket-{{ card.supplement_bucket }}">Supplement: {{ card.supplement_days }}d</span>{% endif %}
+          {% if card.location %}<span class="tag">{{ card.location }}</span>{% endif %}
         </p>
         <form hx-post="/ro/{{ card.ro.id }}/stage" hx-target="#board" hx-swap="outerHTML" method="post" action="/ro/{{ card.ro.id }}/stage">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

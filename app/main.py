@@ -19,6 +19,7 @@ from app.routes import (
     auth_routes,
     board,
     import_routes,
+    location_routes,
     media_routes,
     messages_routes,
     privacy_routes,
@@ -83,6 +84,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         media_routes,
         adjuster_email_routes,
         status_routes,
+        location_routes,
         webhooks,
     ):
         app.include_router(module.router)

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser, get_db, require_admin
 from app.business_days import utcnow
+from app.locations import default_location_id
 from app.csv_import import (
     COLUMNS,
     MAX_BYTES,
@@ -27,6 +28,8 @@ def _page(request: Request, db: Session, current: CurrentUser, status_code: int 
     context.setdefault("upload_id", None)
     context.setdefault("create_missing", False)
     context.setdefault("committed", None)
+    default_id = default_location_id(db, current.shop_id, current.location_id, current.user.location_id)
+    context["default_location"] = next((location for location in current.locations if location.id == default_id), None)
     return render(request, "import.html", db, current, status_code=status_code, columns=COLUMNS, **context)
 
 
@@ -51,7 +54,8 @@ async def import_submit(request: Request, current: CurrentUser = Depends(require
             return _page(request, db, current, status_code=400, file_error="The uploaded file has expired. Upload it again.")
         data = path.read_bytes()
         try:
-            count = commit_import(db, current.shop, current.user, data, create_missing, now)
+            location_id = default_location_id(db, current.shop_id, current.location_id, current.user.location_id)
+            count = commit_import(db, current.shop, current.user, data, create_missing, now, location_id)
         except ImportFileError as exc:
             results = None
             try:

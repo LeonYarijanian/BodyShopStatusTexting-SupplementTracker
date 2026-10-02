@@ -32,7 +32,7 @@ SECTION_5_TABLES = {
 
 
 # Tables added after v1 by the Section 16 roadmap, each with its own migration.
-SECTION_16_TABLES = {"adjuster_emails"}
+SECTION_16_TABLES = {"adjuster_emails", "locations"}
 
 
 def test_t0_1_migrations_create_exactly_the_13_tables(empty_db_url):

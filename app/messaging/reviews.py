@@ -13,16 +13,17 @@ from sqlalchemy.orm import Session
 
 from app.business_days import local_datetime_at, to_local
 from app.enums import MessageDirection, MessageKind, MessageStatus
+from app.locations import review_url_for
 from app.messaging.templates import REVIEW_VARIABLES, replace_variables
-from app.models import Message, RepairOrder, Shop, ShopSettings
+from app.models import Location, Message, RepairOrder, Shop, ShopSettings
 
 SEND_AT = dt.time(10, 0)
 ASK_AGAIN_AFTER = dt.timedelta(days=365)
 SENT_OK = (MessageStatus.SENT, MessageStatus.DELIVERED)
 
 
-def review_variables(shop: Shop, settings: ShopSettings, first_name: str, vehicle: str) -> dict[str, str]:
-    variables = {"first_name": first_name, "shop_name": shop.name, "vehicle": vehicle, "review_url": settings.review_url}
+def review_variables(shop: Shop, settings: ShopSettings, first_name: str, vehicle: str, location: Location | None = None) -> dict[str, str]:
+    variables = {"first_name": first_name, "shop_name": shop.name, "vehicle": vehicle, "review_url": review_url_for(settings, location)}
     assert set(variables) == set(REVIEW_VARIABLES)
     return variables
 
@@ -30,7 +31,7 @@ def review_variables(shop: Shop, settings: ShopSettings, first_name: str, vehicl
 def render_review_request(db: Session, shop: Shop, settings: ShopSettings, ro: RepairOrder) -> str:
     from app.messaging.engine import finish_text
 
-    text = replace_variables(settings.review_request_template, review_variables(shop, settings, ro.customer.first_name, ro.vehicle))
+    text = replace_variables(settings.review_request_template, review_variables(shop, settings, ro.customer.first_name, ro.vehicle, ro.location))
     return finish_text(db, shop, ro.customer.phone_e164, text)
 
 
@@ -39,7 +40,7 @@ def schedule_review_request(db: Session, ro: RepairOrder, now: dt.datetime) -> M
     from app.messaging.engine import sender_number, settings_for
 
     settings = settings_for(db, ro.shop_id)
-    if not settings.review_request_enabled or not settings.review_url or ro.customer.anonymized_at is not None:
+    if not settings.review_request_enabled or not review_url_for(settings, ro.location) or ro.customer.anonymized_at is not None:
         return None
     existing = db.scalar(select(Message.id).where(Message.repair_order_id == ro.id, Message.kind == MessageKind.REVIEW_REQUEST).limit(1))
     if existing is not None:
@@ -54,7 +55,7 @@ def schedule_review_request(db: Session, ro: RepairOrder, now: dt.datetime) -> M
         kind=MessageKind.REVIEW_REQUEST,
         status=MessageStatus.SCHEDULED,
         to_e164=ro.customer.phone_e164,
-        from_e164=sender_number(shop, settings),
+        from_e164=sender_number(shop, settings, ro.location),
         body=render_review_request(db, shop, settings, ro),
         scheduled_send_at=local_datetime_at(send_day, SEND_AT, shop.timezone),
     )

@@ -38,5 +38,5 @@ def reports_page(request: Request, date_from: str = "", date_to: str = "", curre
         date_from=start.isoformat(),
         date_to=end.isoformat(),
         range_error=error,
-        reports=all_reports(db, current.shop_id, start, end, now),
+        reports=all_reports(db, current.shop_id, start, end, now, current.location_id),
     )

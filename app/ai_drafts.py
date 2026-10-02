@@ -77,7 +77,7 @@ def supplement_facts(db: Session, supplement: Supplement, user: User, now: dt.da
         "adjuster_first_name": adjuster.full_name.split()[0] if adjuster and adjuster.full_name.strip() else "there",
         "staff_name": user.full_name,
         "shop_name": shop.name,
-        "shop_phone": format_us_phone(shop.phone_e164),
+        "shop_phone": format_us_phone(ro.location.phone_e164 if ro.location else shop.phone_e164),
     }
 
 

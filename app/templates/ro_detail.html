@@ -11,6 +11,7 @@
         <th>Current stage</th><td><strong>{{ STAGE_LABELS[ro.current_stage] }}</strong></td></tr>
     <tr><th>Payer</th><td>{{ payer }}</td>
         <th>Days in shop</th><td>{{ days_in_shop }}d</td></tr>
+    {% if ro.location and (current.multi_location or not ro.location.is_active) %}<tr><th>Location</th><td colspan="3">{{ ro.location.name }}{% if not ro.location.is_active %} (closed){% endif %} · {{ ro.location.phone_e164 }}</td></tr>{% endif %}
     <tr><th>Insurer</th><td>{{ ro.insurer.name if ro.insurer else '—' }}</td>
         <th>Adjuster</th><td>{{ ro.adjuster.full_name if ro.adjuster else '—' }}</td></tr>
     <tr><th>Claim number</th><td>{{ ro.claim_number or '—' }}</td>

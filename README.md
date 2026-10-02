@@ -82,6 +82,23 @@ Nothing is sent until a person clicks **Approve and send** on the draft page, af
 
 Every RO has a status page at `PUBLIC_BASE_URL/s/<token>`, where the token is long and random. Put `{status_link}` in any stage template (Settings > Texting) to send it, or copy it from the RO page. The page shows the shop, the vehicle, the current stage, progress through the main milestones and the stage history, with the shop's phone number. It never shows prices, the insurer, claim or RO numbers, the customer's last name or phone number. It is not indexed by search engines or cached, and it stops working 30 days after pickup, when the RO is cancelled, or when the customer's data is deleted.
 
+## Multiple locations
+
+A shop with more than one physical location adds them in Settings > Locations. Adding the first extra location turns the shop's own phone and address into a location named Main (rename it if you like), which keeps texting from the shop's Twilio number, and every existing repair order goes there. A shop with one location works exactly as before.
+
+- Every repair order belongs to a location: pick it on the New RO form, move it with Edit RO, or add an optional `location` column (a location name) to a CSV import. Rows without one go to the importer's current location.
+- The location menu in the top bar filters the board, the supplements page, the top-bar counters and all six reports. "All locations" shows everything, with each card tagged by location. Keyword opt-outs in the texting report are per phone number, so they always count for the whole shop.
+- Each user can have a home location (Settings > Users). It is what the menu starts on after login, not a permission: anyone can switch.
+- Texts about an RO show its location's phone number for `{shop_phone}` and go out from the location's own Twilio number when it has one (otherwise the shop's number from the Mode tab). With a messaging service, add each location's number to the service's sender pool. Replies and STOP / START / HELP to a location's number reach the same shop, and HELP answers with that location's phone. The status page, adjuster follow-up emails and the daily digest use the RO's location, and a location can have its own review URL.
+- A location with open repair orders cannot be closed. A closed location's past repair orders stay in the reports.
+
+## Missed-call text-back and AI receptionist (separate product, not built)
+
+Section 16 item 10 is a different product: it is about phone calls, not repair updates. It is left out of this app on purpose and would be built as its own module with its own consent rules. What it would take:
+
+- Missed-call text-back: point the shop's Twilio number's voice webhook at the app, forward the call to the shop's real line with a ring timeout, and when nobody answers send one text to the caller ("Sorry we missed your call..."), at most once a day per number, with STOP handling. The caller never agreed to texts, so a lawyer should confirm the wording and limits first, and these texts must stay separate from the repair-update consent in this app.
+- AI receptionist: a voice agent that answers when the shop can't, using speech-to-text, Claude and text-to-speech over a live call. It would answer common questions (hours, address, towing), give a repair status only after checking the caller's phone number against an open RO, book estimate appointments, and hand off to a person. That needs call recording consent, per-state disclosure rules, a calendar, and testing with real callers, none of which this app has.
+
 ## Pitch demo
 
 After `alembic upgrade head` and `python -m app.seed --demo`, log in as `admin@demo.local` with password `demo-password-123` and follow the 7-step walkthrough in SPEC.md Section 14. Everything works offline: HTMX and Pico.css are vendored in `app/static/`.
@@ -101,8 +118,9 @@ Routes the spec needs but does not name:
 | `GET /adjusters/options`, `POST /adjusters` | Adjuster dropdown filtered by insurer, and the inline Add adjuster |
 | `POST /supplements/{id}/edit` | Edit a DRAFT supplement |
 | `POST /settings/preview` | Live template preview on the Texting tab |
+| `POST /location` | The location menu in the top bar (Section 16 item 9) |
 
-`POST /settings` takes a `tab` field (and an `action` field on the Insurers, Users and Mode tabs). `POST /import` takes `action=dry_run` (with the file) or `action=commit` (with the upload id).
+`POST /settings` takes a `tab` field (and an `action` field on the Locations, Insurers, Users and Mode tabs). `POST /import` takes `action=dry_run` (with the file) or `action=commit` (with the upload id).
 
 Decisions where the spec was silent:
 

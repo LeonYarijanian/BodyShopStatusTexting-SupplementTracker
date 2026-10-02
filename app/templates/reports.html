@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Reports{% endblock %}
 {% block content %}
-<h2>Reports</h2>
+<h2>Reports{% if current.location %} · {{ current.location.name }}{% elif current.multi_location %} · All locations{% endif %}</h2>
 <form method="get" action="/reports" class="grid">
   <label>From<input type="date" name="date_from" value="{{ date_from }}"></label>
   <label>To<input type="date" name="date_to" value="{{ date_to }}"></label>
@@ -98,7 +98,7 @@
       <tr><th>Failed</th><td>{{ r.failed }}</td></tr>
       <tr><th>Blocked for no consent</th><td>{{ r.blocked_no_consent }}</td></tr>
       <tr><th>Blocked for opt-out</th><td>{{ r.blocked_opted_out }}</td></tr>
-      <tr><th>Opt-outs by keyword</th><td>{{ r.opt_outs_by_keyword }}</td></tr>
+      <tr><th>Opt-outs by keyword{% if current.location %} (all locations){% endif %}</th><td>{{ r.opt_outs_by_keyword }}</td></tr>
       <tr><th>Inbound replies</th><td>{{ r.inbound_replies }}</td></tr>
     </tbody>
   </table>

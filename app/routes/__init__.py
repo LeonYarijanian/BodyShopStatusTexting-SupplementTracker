@@ -48,9 +48,9 @@ def topbar(db: Session, current: CurrentUser) -> dict:
     now = utcnow()
     settings = shop_settings(db, current.shop_id)
     return {
-        "needs_reply": needs_reply_count(db, current.shop_id),
-        "follow_ups_due": follow_ups_due_count(db, current.shop_id, now),
-        "waiting": format_cents(dollars_waiting(db, current.shop_id)),
+        "needs_reply": needs_reply_count(db, current.shop_id, current.location_id),
+        "follow_ups_due": follow_ups_due_count(db, current.shop_id, now, current.location_id),
+        "waiting": format_cents(dollars_waiting(db, current.shop_id, current.location_id)),
         "mode": settings.messaging_mode if settings else MessagingMode.DEMO,
     }
 

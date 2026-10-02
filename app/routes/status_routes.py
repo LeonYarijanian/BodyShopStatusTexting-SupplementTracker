@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_db
 from app.business_days import utcnow
 from app.enums import STAGE_LABELS, PayerType, Stage
+from app.locations import address_for, phone_for, shop_locations
 from app.messaging.templates import format_us_phone
 from app.models import RepairOrder, Shop, StageEvent
 from app.routes import templates
@@ -53,7 +54,10 @@ def status_page(token: str, request: Request, db: Session = Depends(get_db)):
         "request": request,
         "ro": ro,
         "shop": shop,
-        "shop_phone": format_us_phone(shop.phone_e164),
+        "shop_phone": format_us_phone(phone_for(shop, ro.location)),
+        "shop_phone_e164": phone_for(shop, ro.location),
+        "address": address_for(shop, ro.location),
+        "location_name": ro.location.name if ro.location and len(shop_locations(db, shop.id)) > 1 else None,
         "stage_label": STAGE_LABELS[ro.current_stage],
         "milestones": milestones,
         "history": history,

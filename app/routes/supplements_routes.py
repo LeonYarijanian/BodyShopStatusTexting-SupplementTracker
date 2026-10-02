@@ -16,6 +16,7 @@ from app.supplements import (
     DECIDED_STATUSES,
     SupplementError,
     aging_bucket,
+    at_location,
     create_supplement,
     days_open,
     dollars_waiting,
@@ -78,23 +79,25 @@ def supplements_page(request: Request, tab: str = "open", current: CurrentUser =
     tz = current.shop.timezone
     statuses = TABS[tab][1]
     supplements = db.scalars(
-        select(Supplement).where(Supplement.shop_id == current.shop_id, Supplement.status.in_(statuses))
+        at_location(select(Supplement).where(Supplement.shop_id == current.shop_id, Supplement.status.in_(statuses)), current.location_id)
     ).all()
     rows = [supplement_row(s, now, tz) for s in supplements]
     rows.sort(key=lambda r: (r["days_open"] if r["days_open"] is not None else -1, r["s"].requested_cents), reverse=True)
 
     open_rows = [
         supplement_row(s, now, tz)
-        for s in db.scalars(select(Supplement).where(Supplement.shop_id == current.shop_id, Supplement.status == SupplementStatus.SUBMITTED)).all()
+        for s in db.scalars(
+            at_location(select(Supplement).where(Supplement.shop_id == current.shop_id, Supplement.status == SupplementStatus.SUBMITTED), current.location_id)
+        ).all()
     ]
     bucket_counts = {bucket.value: 0 for bucket in AgingBucket}
     for row in open_rows:
         bucket_counts[row["bucket"]] += 1
     summary = {
         "open_count": len(open_rows),
-        "dollars_waiting": dollars_waiting(db, current.shop_id),
+        "dollars_waiting": dollars_waiting(db, current.shop_id, current.location_id),
         "bucket_counts": bucket_counts,
-        "follow_ups_due": follow_ups_due_count(db, current.shop_id, now),
+        "follow_ups_due": follow_ups_due_count(db, current.shop_id, now, current.location_id),
     }
     return render(
         request,

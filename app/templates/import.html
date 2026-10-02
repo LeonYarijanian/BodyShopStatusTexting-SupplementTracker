@@ -7,6 +7,7 @@
   <summary>Columns</summary>
   <p><code>{{ columns|join(",") }}</code></p>
   <p>Required: ro_number, checked_in_date, customer_first_name, customer_phone, vehicle_year, vehicle_make, vehicle_model, payer_type, original_estimate, and insurer_name for INSURANCE rows. UTF-8, comma-separated, at most 2 MB and 1,000 data rows.</p>
+  {% if current.locations %}<p>location is optional: one of {% for location in current.locations %}{{ location.name }}{{ ", " if not loop.last }}{% endfor %}. Rows without one go to {{ default_location.name }}.</p>{% endif %}
 </details>
 
 {% if committed is not none %}

@@ -7,11 +7,12 @@ from sqlalchemy.orm import Session
 from app.auth import CurrentUser, get_db, require_user
 from app.business_days import utcnow
 from app.enums import ACTIVE_STAGES, ConsentStatus, SupplementStatus
+from app.locations import scope_ros
 from app.messaging.engine import consent_statuses
 from app.models import RepairOrder, Supplement
 from app.routes import render, shop_settings
 from app.routes.repair_orders import days_in_shop, payer_label
-from app.supplements import aging_bucket, days_open
+from app.supplements import aging_bucket, at_location, days_open
 
 router = APIRouter()
 
@@ -20,15 +21,14 @@ def board_context(db: Session, current: CurrentUser) -> dict:
     now = utcnow()
     tz = current.shop.timezone
     ros = db.scalars(
-        select(RepairOrder)
-        .where(RepairOrder.shop_id == current.shop_id, RepairOrder.current_stage.in_(ACTIVE_STAGES))
+        scope_ros(select(RepairOrder).where(RepairOrder.shop_id == current.shop_id, RepairOrder.current_stage.in_(ACTIVE_STAGES)), current.location_id)
         .order_by(RepairOrder.checked_in_at, RepairOrder.id)
     ).all()
     consents = consent_statuses(db, current.shop_id)
 
     oldest_open: dict[int, int] = {}
     for supplement in db.scalars(
-        select(Supplement).where(Supplement.shop_id == current.shop_id, Supplement.status == SupplementStatus.SUBMITTED)
+        at_location(select(Supplement).where(Supplement.shop_id == current.shop_id, Supplement.status == SupplementStatus.SUBMITTED), current.location_id)
     ).all():
         days = days_open(supplement, now, tz)
         if days is not None and days >= oldest_open.get(supplement.repair_order_id, -1):
@@ -47,6 +47,7 @@ def board_context(db: Session, current: CurrentUser) -> dict:
                 "no_texts": consents.get(customer.phone_e164) != ConsentStatus.OPTED_IN,
                 "supplement_days": supplement_days,
                 "supplement_bucket": aging_bucket(supplement_days).value if supplement_days is not None else None,
+                "location": ro.location.name if current.multi_location and not current.location_id and ro.location else None,
             }
         )
     settings = shop_settings(db, current.shop_id)

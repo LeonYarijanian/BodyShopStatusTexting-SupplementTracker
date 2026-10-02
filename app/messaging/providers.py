@@ -21,7 +21,7 @@ class ProviderError(RuntimeError):
 class DemoProvider:
     """DEMO mode: nothing leaves the computer."""
 
-    def send(self, to: str, body: str, from_: str | None = None, media_url: str | None = None) -> str:
+    def send(self, to: str, body: str, from_: str | None = None, media_url: str | None = None, location_number: str | None = None) -> str:
         message_id = f"demo-{uuid.uuid4()}"
         if media_url:
             print(f"[DEMO MMS] to={mask_phone(to)} body={body} media={media_url}", flush=True)
@@ -44,7 +44,9 @@ class TwilioProvider:
         self.shop_settings = shop_settings
         self.app_settings = app_settings
 
-    def send(self, to: str, body: str, from_: str | None = None, media_url: str | None = None) -> str:
+    def send(self, to: str, body: str, from_: str | None = None, media_url: str | None = None, location_number: str | None = None) -> str:
+        """`location_number` is a location's own Twilio number (Section 16 item 9). With a messaging service it is
+        sent as From too, so the text comes from that location; the number must be in the service's sender pool."""
         if self.shop_settings.messaging_mode != MessagingMode.LIVE or not self.app_settings.ALLOW_LIVE_SMS:
             raise ProviderError("TwilioProvider can send only in LIVE mode with ALLOW_LIVE_SMS=true.")
         client = make_twilio_client(self.app_settings.TWILIO_ACCOUNT_SID, self.app_settings.TWILIO_AUTH_TOKEN)
@@ -57,8 +59,10 @@ class TwilioProvider:
             kwargs["media_url"] = [media_url]
         if self.shop_settings.twilio_messaging_service_sid:
             kwargs["messaging_service_sid"] = self.shop_settings.twilio_messaging_service_sid
+            if location_number:
+                kwargs["from_"] = location_number
         else:
-            kwargs["from_"] = self.shop_settings.twilio_from_e164
+            kwargs["from_"] = location_number or self.shop_settings.twilio_from_e164
         message = client.messages.create(**kwargs)
         return message.sid
 

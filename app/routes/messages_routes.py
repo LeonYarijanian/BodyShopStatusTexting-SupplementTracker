@@ -157,7 +157,7 @@ async def simulate_reply_route(ro_id: int, request: Request, current: CurrentUse
         db,
         current.shop,
         from_e164=ro.customer.phone_e164,
-        to_e164=sender_number(current.shop, shop_settings),
+        to_e164=sender_number(current.shop, shop_settings, ro.location),
         body=body,
         now=utcnow(),
         app_settings=request.app.state.settings,

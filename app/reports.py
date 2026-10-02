@@ -18,9 +18,10 @@ from app.enums import (
     MessageStatus,
     PayerType,
 )
+from app.locations import scope_ros
 from app.models import Adjuster, Consent, Message, RepairOrder, Shop, ShopSettings, Supplement
 from app.money import format_decimal
-from app.supplements import DECIDED_STATUSES, aging_bucket, days_open
+from app.supplements import DECIDED_STATUSES, aging_bucket, at_location, days_open
 
 NO_DATA = "No data"
 CUSTOMER_PAY_GROUP = "Customer pay"
@@ -92,19 +93,14 @@ def _payer_group(ro: RepairOrder) -> str:
     return ro.insurer.name if ro.insurer else "Insurance"
 
 
-def _delivered_in_range(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime) -> list[RepairOrder]:
-    return list(
-        db.scalars(
-            select(RepairOrder)
-            .where(
-                RepairOrder.shop_id == shop_id,
-                RepairOrder.delivered_at.is_not(None),
-                RepairOrder.delivered_at >= start,
-                RepairOrder.delivered_at < end,
-            )
-            .order_by(RepairOrder.delivered_at, RepairOrder.id)
-        ).all()
+def _delivered_in_range(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime, location_id: int | None = None) -> list[RepairOrder]:
+    query = select(RepairOrder).where(
+        RepairOrder.shop_id == shop_id,
+        RepairOrder.delivered_at.is_not(None),
+        RepairOrder.delivered_at >= start,
+        RepairOrder.delivered_at < end,
     )
+    return list(db.scalars(scope_ros(query, location_id).order_by(RepairOrder.delivered_at, RepairOrder.id)).all())
 
 
 # ---------------------------------------------------------------- report 1: cycle time
@@ -114,8 +110,8 @@ def cycle_days(ro: RepairOrder) -> Decimal:
     return Decimal(int((ro.delivered_at - ro.checked_in_at).total_seconds())) / SECONDS_PER_DAY
 
 
-def report_cycle_time(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime) -> dict:
-    ros = _delivered_in_range(db, shop_id, start, end)
+def report_cycle_time(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime, location_id: int | None = None) -> dict:
+    ros = _delivered_in_range(db, shop_id, start, end, location_id)
     groups: dict[str, list[Decimal]] = defaultdict(list)
     for ro in ros:
         groups[_payer_group(ro)].append(cycle_days(ro))
@@ -147,16 +143,15 @@ def _speed_rows(groups: dict[str, list[Supplement]], tz: str) -> list[dict]:
     return rows
 
 
-def report_decision_speed(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime, tz: str) -> dict:
-    supplements = db.scalars(
-        select(Supplement).where(
-            Supplement.shop_id == shop_id,
-            Supplement.status.in_(DECIDED_STATUSES),
-            Supplement.decided_at.is_not(None),
-            Supplement.decided_at >= start,
-            Supplement.decided_at < end,
-        )
-    ).all()
+def report_decision_speed(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime, tz: str, location_id: int | None = None) -> dict:
+    query = select(Supplement).where(
+        Supplement.shop_id == shop_id,
+        Supplement.status.in_(DECIDED_STATUSES),
+        Supplement.decided_at.is_not(None),
+        Supplement.decided_at >= start,
+        Supplement.decided_at < end,
+    )
+    supplements = db.scalars(at_location(query, location_id)).all()
     by_insurer: dict[str, list[Supplement]] = defaultdict(list)
     by_adjuster: dict[str, list[Supplement]] = defaultdict(list)
     for supplement in supplements:
@@ -170,10 +165,10 @@ def report_decision_speed(db: Session, shop_id: int, start: dt.datetime, end: dt
 # ---------------------------------------------------------------- report 3: open supplement aging
 
 
-def report_open_aging(db: Session, shop_id: int, now: dt.datetime, tz: str) -> dict:
+def report_open_aging(db: Session, shop_id: int, now: dt.datetime, tz: str, location_id: int | None = None) -> dict:
     """All SUBMITTED supplements now; ignores the date range."""
     buckets = {bucket: {"count": 0, "cents": 0} for bucket in AgingBucket}
-    supplements = db.scalars(select(Supplement).where(Supplement.shop_id == shop_id, Supplement.status == "SUBMITTED")).all()
+    supplements = db.scalars(at_location(select(Supplement).where(Supplement.shop_id == shop_id, Supplement.status == "SUBMITTED"), location_id)).all()
     for supplement in supplements:
         bucket = aging_bucket(days_open(supplement, now, tz))
         buckets[bucket]["count"] += 1
@@ -188,8 +183,8 @@ def report_open_aging(db: Session, shop_id: int, now: dt.datetime, tz: str) -> d
 # ---------------------------------------------------------------- report 4: revenue by payer
 
 
-def report_revenue_by_payer(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime, warning_pct: int) -> dict:
-    ros = _delivered_in_range(db, shop_id, start, end)
+def report_revenue_by_payer(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime, warning_pct: int, location_id: int | None = None) -> dict:
+    ros = _delivered_in_range(db, shop_id, start, end, location_id)
     revenue: dict[str, int] = defaultdict(int)
     is_insurer: dict[str, bool] = {}
     for ro in ros:
@@ -226,8 +221,8 @@ def waiting_days(intervals: list[tuple[dt.datetime, dt.datetime]]) -> Decimal:
     return Decimal(seconds) / SECONDS_PER_DAY
 
 
-def report_days_waiting(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime) -> dict:
-    ros = [ro for ro in _delivered_in_range(db, shop_id, start, end) if ro.payer_type == PayerType.INSURANCE]
+def report_days_waiting(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime, location_id: int | None = None) -> dict:
+    ros = [ro for ro in _delivered_in_range(db, shop_id, start, end, location_id) if ro.payer_type == PayerType.INSURANCE]
     per_ro = []
     for ro in ros:
         intervals = [
@@ -249,10 +244,13 @@ def report_days_waiting(db: Session, shop_id: int, start: dt.datetime, end: dt.d
 # ---------------------------------------------------------------- report 6: texting
 
 
-def report_texting(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime) -> dict:
-    messages = db.scalars(
-        select(Message).where(Message.shop_id == shop_id, Message.created_at >= start, Message.created_at < end)
-    ).all()
+def report_texting(db: Session, shop_id: int, start: dt.datetime, end: dt.datetime, location_id: int | None = None) -> dict:
+    """With a location, counts the texts about that location's ROs. Keyword opt-outs are per phone number, so
+    they are always counted for the whole shop."""
+    query = select(Message).where(Message.shop_id == shop_id, Message.created_at >= start, Message.created_at < end)
+    if location_id is not None:
+        query = query.join(RepairOrder, Message.repair_order_id == RepairOrder.id).where(RepairOrder.location_id == location_id)
+    messages = db.scalars(query).all()
     outbound = [m for m in messages if m.direction == MessageDirection.OUTBOUND]
     attempted = [m for m in outbound if m.status in (MessageStatus.SENT, MessageStatus.DELIVERED, MessageStatus.FAILED)]
     delivered = sum(1 for m in outbound if m.status == MessageStatus.DELIVERED)
@@ -282,16 +280,17 @@ def report_texting(db: Session, shop_id: int, start: dt.datetime, end: dt.dateti
 # ---------------------------------------------------------------- all six
 
 
-def all_reports(db: Session, shop_id: int, date_from: dt.date, date_to: dt.date, now: dt.datetime) -> dict:
+def all_reports(db: Session, shop_id: int, date_from: dt.date, date_to: dt.date, now: dt.datetime, location_id: int | None = None) -> dict:
+    """All six reports, for the whole shop or (Section 16 item 9) for one location."""
     shop = db.get(Shop, shop_id)
     settings = db.scalar(select(ShopSettings).where(ShopSettings.shop_id == shop_id))
     tz = shop.timezone
     start, end = range_bounds(date_from, date_to, tz)
     return {
-        "cycle_time": report_cycle_time(db, shop_id, start, end),
-        "decision_speed": report_decision_speed(db, shop_id, start, end, tz),
-        "open_aging": report_open_aging(db, shop_id, now, tz),
-        "revenue": report_revenue_by_payer(db, shop_id, start, end, settings.concentration_warning_pct),
-        "days_waiting": report_days_waiting(db, shop_id, start, end),
-        "texting": report_texting(db, shop_id, start, end),
+        "cycle_time": report_cycle_time(db, shop_id, start, end, location_id),
+        "decision_speed": report_decision_speed(db, shop_id, start, end, tz, location_id),
+        "open_aging": report_open_aging(db, shop_id, now, tz, location_id),
+        "revenue": report_revenue_by_payer(db, shop_id, start, end, settings.concentration_warning_pct, location_id),
+        "days_waiting": report_days_waiting(db, shop_id, start, end, location_id),
+        "texting": report_texting(db, shop_id, start, end, location_id),
     }

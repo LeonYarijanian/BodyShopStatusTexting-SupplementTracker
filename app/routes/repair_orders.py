@@ -25,9 +25,10 @@ from app.enums import (
     Stage,
     SupplementEventType,
 )
+from app.locations import default_location_id, scope_ros
 from app.messaging.templates import parse_us_phone
 from app.status_page import ensure_status_token, link_is_active, status_url
-from app.models import Adjuster, Consent, Customer, Insurer, Message, RepairOrder, StageEvent, Supplement, SupplementEvent, User
+from app.models import Adjuster, Consent, Customer, Insurer, Location, Message, RepairOrder, StageEvent, Supplement, SupplementEvent, User
 from app.money import dollars_to_cents
 from app.routes import is_htmx, render, shop_settings
 
@@ -53,18 +54,14 @@ class ROError(ValueError):
 # ---------------------------------------------------------------- queries
 
 
-def needs_reply_count(db: Session, shop_id: int) -> int:
-    """Active ROs with needs_reply = true."""
-    return int(
-        db.scalar(
-            select(func.count(RepairOrder.id)).where(
-                RepairOrder.shop_id == shop_id,
-                RepairOrder.needs_reply.is_(True),
-                RepairOrder.current_stage.in_(ACTIVE_STAGES),
-            )
-        )
-        or 0
+def needs_reply_count(db: Session, shop_id: int, location_id: int | None = None) -> int:
+    """Active ROs with needs_reply = true (at one location when `location_id` is given)."""
+    query = select(func.count(RepairOrder.id)).where(
+        RepairOrder.shop_id == shop_id,
+        RepairOrder.needs_reply.is_(True),
+        RepairOrder.current_stage.in_(ACTIVE_STAGES),
     )
+    return int(db.scalar(scope_ros(query, location_id)) or 0)
 
 
 def days_in_shop(ro: RepairOrder, now: dt.datetime) -> int:
@@ -111,6 +108,14 @@ def _int_or_none(text: str) -> int | None:
 def parse_local_datetime(text: str, tz: str) -> dt.datetime:
     """A datetime-local value ("2026-10-05T13:00") in the shop's time zone -> UTC."""
     return local_to_utc(dt.datetime.fromisoformat(text.strip()), tz)
+
+
+def location_options(db: Session, current: CurrentUser, ro: RepairOrder | None = None) -> list[Location]:
+    """Locations an RO can be put at: the active ones, plus the RO's own location if it was closed."""
+    options = list(current.locations)
+    if ro is not None and ro.location is not None and ro.location not in options:
+        options.append(ro.location)
+    return options
 
 
 def validate_vin(text: str) -> str | None:
@@ -240,6 +245,17 @@ def validate_ro_form(db: Session, current: CurrentUser, form, now: dt.datetime, 
     if ro is not None and ro.delivered_at is not None and clean.get("checked_in_at") and clean["checked_in_at"] > ro.delivered_at:
         errors["checked_in_at"] = "Check-in time must be on or before the delivery time."
 
+    options = location_options(db, current, ro)
+    if len(options) >= 2:
+        chosen = _int_or_none(_text(form, "location_id"))
+        if chosen not in {location.id for location in options}:
+            errors["location_id"] = "Choose the location."
+        clean["location_id"] = chosen
+    elif ro is not None:
+        clean["location_id"] = ro.location_id
+    else:
+        clean["location_id"] = options[0].id if options else None
+
     clean["consent"] = form.get("consent") in ("yes", "on", "true", "1")
     clean["review_consent"] = form.get("review_consent") in ("yes", "on", "true", "1")
     method = _text(form, "consent_method")
@@ -313,6 +329,7 @@ def create_repair_order(db: Session, current: CurrentUser, clean: dict, now: dt.
         original_estimate_cents=clean["original_estimate_cents"],
         current_stage=Stage.CHECKED_IN,
         checked_in_at=clean["checked_in_at"],
+        location_id=clean.get("location_id"),
     )
     ensure_status_token(ro)
     db.add(ro)
@@ -356,6 +373,7 @@ def update_repair_order(db: Session, current: CurrentUser, ro: RepairOrder, clea
         "adjuster_id",
         "original_estimate_cents",
         "checked_in_at",
+        "location_id",
     ):
         setattr(ro, field, clean[field])
     ro.claim_number = clean["claim_number"] if clean["payer_type"] == PayerType.INSURANCE else None
@@ -428,6 +446,7 @@ def form_context(db: Session, current: CurrentUser, values: dict, errors: dict, 
         "review_consent_script": REVIEW_CONSENT_SCRIPT,
         "review_requests_on": shop_settings(db, current.shop_id).review_request_enabled,
         "consent_methods": CHECKIN_CONSENT_METHODS,
+        "locations": location_options(db, current, ro),
     }
 
 
@@ -437,7 +456,11 @@ def _now_local_input(current: CurrentUser) -> str:
 
 @router.get("/ro/new")
 def new_ro_page(request: Request, current: CurrentUser = Depends(require_user), db: Session = Depends(get_db)):
-    values = {"payer_type": PayerType.INSURANCE.value, "checked_in_at": _now_local_input(current)}
+    values = {
+        "payer_type": PayerType.INSURANCE.value,
+        "checked_in_at": _now_local_input(current),
+        "location_id": default_location_id(db, current.shop_id, current.location_id, current.user.location_id) or "",
+    }
     return render(request, "ro_form.html", db, current, **form_context(db, current, values, {}, None))
 
 
@@ -474,6 +497,7 @@ def edit_ro_page(ro_id: int, request: Request, current: CurrentUser = Depends(re
         "claim_number": ro.claim_number or "",
         "original_estimate": f"{ro.original_estimate_cents // 100}.{ro.original_estimate_cents % 100:02d}",
         "checked_in_at": to_local(ro.checked_in_at, tz).strftime("%Y-%m-%dT%H:%M"),
+        "location_id": ro.location_id or "",
     }
     return render(request, "ro_form.html", db, current, **form_context(db, current, values, {}, ro))
 

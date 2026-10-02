@@ -28,7 +28,8 @@ from app.messaging.templates import (
 )
 from app.digest import MAX_RECIPIENTS as MAX_DIGEST_RECIPIENTS
 from app.mailer import valid_email
-from app.models import Adjuster, Insurer, Shop, ShopSettings, User
+from app.locations import LocationError, add_location, open_ro_count, set_active, set_home_location, shop_locations, update_location
+from app.models import Adjuster, Insurer, Location, Shop, ShopSettings, User
 from app.routes import render, shop_settings
 from app.status_page import PREVIEW_STATUS_LINK_TOKEN, status_url
 
@@ -36,6 +37,7 @@ router = APIRouter()
 
 TABS = {
     "shop": "Shop",
+    "locations": "Locations",
     "texting": "Texting",
     "supplements": "Supplements",
     "insurers": "Insurers and adjusters",
@@ -282,6 +284,12 @@ def save_user(db: Session, current: CurrentUser, form, action: str) -> str:
             raise SettingsError("You cannot deactivate yourself.")
         user.is_active = False
         return f"Deactivated {user.full_name}."
+    if action == "set_location":
+        try:
+            set_home_location(db, user, _id(form, "location_id") or None)
+        except LocationError as exc:
+            raise SettingsError(str(exc)) from None
+        return f"Saved the home location for {user.full_name}."
     if action == "reset_password":
         password = form.get("password") or ""
         try:
@@ -293,7 +301,35 @@ def save_user(db: Session, current: CurrentUser, form, action: str) -> str:
     raise SettingsError("Unknown action.")
 
 
-def save_mode(settings: ShopSettings, form, app_settings) -> list[str]:
+def _id(form, name: str) -> int:
+    text = _text(form, name)
+    return int(text) if text.isdigit() else 0
+
+
+def save_locations(db: Session, current: CurrentUser, form) -> str:
+    """Section 16 item 9: add, edit, close or reopen a location."""
+    action = _text(form, "action")
+    values = {name: _text(form, name) for name in ("name", "phone", "address", "twilio_from_e164", "review_url")}
+    try:
+        if action == "add":
+            location = add_location(db, current.shop, values)
+            return f"Added {location.name}."
+        location = get_owned(db, Location, _id(form, "location_id"), current.shop_id)
+        if action == "edit":
+            update_location(db, current.shop, location, values)
+            return f"Saved {location.name}."
+        if action == "close":
+            set_active(db, location, False)
+            return f"Closed {location.name}. Its past repair orders stay in the reports."
+        if action == "reopen":
+            set_active(db, location, True)
+            return f"Reopened {location.name}."
+    except LocationError as exc:
+        raise SettingsError(str(exc)) from None
+    raise SettingsError("Unknown action.")
+
+
+def save_mode(db: Session, settings: ShopSettings, form, app_settings) -> list[str]:
     """Save the Twilio fields and checkboxes, or switch the mode. Returns failed LIVE preconditions."""
     action = _text(form, "action")
     if action == "switch":
@@ -308,6 +344,8 @@ def save_mode(settings: ShopSettings, form, app_settings) -> list[str]:
                 raise ValueError
         except ValueError:
             raise SettingsError("twilio_from_e164 must be empty or a valid E.164 number, such as +18185550188.") from None
+        if db.scalar(select(Location.id).where(Location.twilio_from_e164 == from_e164).limit(1)) is not None:
+            raise SettingsError("twilio_from_e164 is already a location's own Twilio number (Settings > Locations).")
     service_sid = _text(form, "twilio_messaging_service_sid")
     if service_sid and not service_sid.startswith("MG"):
         raise SettingsError("twilio_messaging_service_sid must be empty or start with MG.")
@@ -352,6 +390,8 @@ def settings_context(db: Session, current: CurrentUser, request: Request, tab: s
         "stage_rows": stage_rows,
         "preconditions": live_preconditions(settings, request.app.state.settings),
         "roles": list(Role),
+        "locations": (locations := shop_locations(db, current.shop_id, active_only=False)),
+        "open_counts": {location.id: open_ro_count(db, location) for location in locations},
     }
 
 
@@ -383,10 +423,12 @@ async def settings_save(request: Request, current: CurrentUser = Depends(require
                 save_adjuster(db, current, form)
             else:
                 save_insurer(db, current, form)
+        elif tab == "locations":
+            notice = save_locations(db, current, form)
         elif tab == "users":
             notice = save_user(db, current, form, _text(form, "action"))
         elif tab == "mode":
-            failed = save_mode(settings, form, request.app.state.settings)
+            failed = save_mode(db, settings, form, request.app.state.settings)
             if failed:
                 raise SettingsError("LIVE mode refused. These conditions are not met:")
             notice = f"Mode is {settings.messaging_mode.value}." if _text(form, "action") == "switch" else "Saved."

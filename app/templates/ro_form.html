@@ -87,6 +87,15 @@
 
   <fieldset>
     <legend><strong>Estimate and check-in</strong></legend>
+    {% if locations|length >= 2 %}
+    <label>Location
+      <select name="location_id"{% if errors.location_id %} aria-invalid="true"{% endif %}>
+        <option value="">Choose…</option>
+        {% for location in locations %}<option value="{{ location.id }}"{% if values.location_id|string == location.id|string %} selected{% endif %}>{{ location.name }}{% if not location.is_active %} (closed){% endif %}</option>{% endfor %}
+      </select>
+      {% if errors.location_id %}<small class="error">{{ errors.location_id }}</small>{% endif %}
+    </label>
+    {% endif %}
     <div class="grid">
       <label>Original estimate ($)
         <input name="original_estimate" inputmode="decimal" value="{{ values.original_estimate or '' }}" required{% if errors.original_estimate %} aria-invalid="true"{% endif %}>

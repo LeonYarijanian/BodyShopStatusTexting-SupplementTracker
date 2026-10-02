@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.business_days import is_business_day, to_local
 from app.config import Settings, get_settings
 from app.enums import SupplementStatus
+from app.locations import shop_locations
 from app.mailer import get_mailer
 from app.messaging.templates import format_us_phone
 from app.models import Shop, ShopSettings, Supplement
@@ -47,6 +48,7 @@ def build_digest(db: Session, shop: Shop, now: dt.datetime, base_url: str = "") 
         f"Dollars waiting on insurers: {format_cents(dollars_waiting(db, shop.id))}.",
         "",
     ]
+    multi_location = len(shop_locations(db, shop.id)) >= 2
     for number, supplement in enumerate(due, start=1):
         ro = supplement.repair_order
         customer = ro.customer
@@ -61,7 +63,8 @@ def build_digest(db: Session, shop: Shop, now: dt.datetime, base_url: str = "") 
             who += f" ({', '.join(contact)})"
         days = days_open(supplement, now, tz)
         lines += [
-            f"{number}. RO {ro.ro_number} S{supplement.sequence_number}: {ro.vehicle}, {customer.first_name}",
+            f"{number}. RO {ro.ro_number} S{supplement.sequence_number}: {ro.vehicle}, {customer.first_name}"
+            + (f" ({ro.location.name})" if multi_location and ro.location else ""),
             f"   {ro.insurer.name if ro.insurer else 'Insurer'}, claim {ro.claim_number or '(no claim number)'}, adjuster {who}",
             f"   {format_cents(supplement.requested_cents)} requested, waiting {days_open_phrase(days)}, "
             f"{supplement.follow_up_count} follow-up{'s' if supplement.follow_up_count != 1 else ''} so far "

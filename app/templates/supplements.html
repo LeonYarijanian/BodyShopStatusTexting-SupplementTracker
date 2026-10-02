@@ -17,7 +17,7 @@
   <tbody>
     {% for row in rows %}{% set s = row.s %}{% set ro = s.repair_order %}
     <tr{% if row.due %} class="due"{% endif %} data-supplement-id="{{ s.id }}">
-      <td><a href="/ro/{{ ro.id }}">{{ ro.ro_number }}</a>{% if row.due %} <span class="tag tag-due">Due</span>{% endif %}</td>
+      <td><a href="/ro/{{ ro.id }}">{{ ro.ro_number }}</a>{% if row.due %} <span class="tag tag-due">Due</span>{% endif %}{% if current.multi_location and not current.location_id and ro.location %} <span class="tag">{{ ro.location.name }}</span>{% endif %}</td>
       <td>{{ ro.customer.first_name }} {{ ro.customer.last_name or '' }}</td>
       <td>{{ ro.vehicle }}</td>
       <td>{{ ro.insurer.name if ro.insurer else '' }}</td>

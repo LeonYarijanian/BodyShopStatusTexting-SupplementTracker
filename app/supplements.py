@@ -65,29 +65,28 @@ def is_follow_up_due(supplement: Supplement, now: dt.datetime) -> bool:
     )
 
 
-def dollars_waiting(db: Session, shop_id: int) -> int:
+def at_location(query, location_id: int | None):
+    """Limit a supplements query to the ROs of one location (Section 16 item 9). None means every location."""
+    if location_id is None:
+        return query
+    return query.join(RepairOrder, Supplement.repair_order_id == RepairOrder.id).where(RepairOrder.location_id == location_id)
+
+
+def dollars_waiting(db: Session, shop_id: int, location_id: int | None = None) -> int:
     """Sum of requested_cents over all SUBMITTED supplements."""
-    total = db.scalar(
-        select(func.coalesce(func.sum(Supplement.requested_cents), 0)).where(
-            Supplement.shop_id == shop_id, Supplement.status == S.SUBMITTED
-        )
-    )
-    return int(total or 0)
+    query = select(func.coalesce(func.sum(Supplement.requested_cents), 0)).where(Supplement.shop_id == shop_id, Supplement.status == S.SUBMITTED)
+    return int(db.scalar(at_location(query, location_id)) or 0)
 
 
-def follow_ups_due_count(db: Session, shop_id: int, now: dt.datetime) -> int:
+def follow_ups_due_count(db: Session, shop_id: int, now: dt.datetime, location_id: int | None = None) -> int:
     """SUBMITTED supplements whose next_follow_up_due_at is at or before now."""
-    return int(
-        db.scalar(
-            select(func.count(Supplement.id)).where(
-                Supplement.shop_id == shop_id,
-                Supplement.status == S.SUBMITTED,
-                Supplement.next_follow_up_due_at.is_not(None),
-                Supplement.next_follow_up_due_at <= now,
-            )
-        )
-        or 0
+    query = select(func.count(Supplement.id)).where(
+        Supplement.shop_id == shop_id,
+        Supplement.status == S.SUBMITTED,
+        Supplement.next_follow_up_due_at.is_not(None),
+        Supplement.next_follow_up_due_at <= now,
     )
+    return int(db.scalar(at_location(query, location_id)) or 0)
 
 
 # ---------------------------------------------------------------- follow-up schedule
@@ -280,5 +279,5 @@ def follow_up_email(db: Session, supplement: Supplement, user: User, now: dt.dat
         f"Thank you,\n"
         f"{user.full_name}\n"
         f"{shop.name}\n"
-        f"{format_us_phone(shop.phone_e164)}\n"
+        f"{format_us_phone(ro.location.phone_e164 if ro.location else shop.phone_e164)}\n"
     )

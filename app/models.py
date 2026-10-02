@@ -122,6 +122,22 @@ class ShopSettings(TimestampMixin, Base):
     shop: Mapped[Shop] = relationship(back_populates="settings")
 
 
+class Location(TimestampMixin, Base):
+    """Section 16 item 9: a physical shop. Optional: a shop with no locations works exactly like v1."""
+
+    __tablename__ = "locations"
+    __table_args__ = (UniqueConstraint("shop_id", "name", name="uq_locations_shop_name"),)
+
+    shop_id: Mapped[int] = shop_fk()
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    phone_e164: Mapped[str] = mapped_column(String(16), nullable=False)
+    address: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    twilio_from_e164: Mapped[str] = mapped_column(String(16), nullable=False, default="")
+    # Each location usually has its own Google review page; empty means the shop's review URL.
+    review_url: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
 class User(TimestampMixin, Base):
     __tablename__ = "users"
 
@@ -131,6 +147,8 @@ class User(TimestampMixin, Base):
     full_name: Mapped[str] = mapped_column(String(120), nullable=False)
     role: Mapped[Role] = mapped_column(enum_column(Role), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Section 16 item 9: the location this user sees by default (null = all locations).
+    location_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"), nullable=True)
 
 
 class LoginAttempt(TimestampMixin, Base):
@@ -209,8 +227,11 @@ class RepairOrder(TimestampMixin, Base):
     needs_reply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Section 16 item 8: the random part of the customer's status page link.
     status_token: Mapped[str | None] = mapped_column(String(40), nullable=True, unique=True, index=True)
+    # Section 16 item 9: which location the car is at (null for single-location shops).
+    location_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"), nullable=True, index=True)
 
     customer: Mapped[Customer] = relationship()
+    location: Mapped[Location | None] = relationship()
     insurer: Mapped[Insurer | None] = relationship()
     adjuster: Mapped[Adjuster | None] = relationship()
 

@@ -42,6 +42,19 @@
       {% endif %}
     </ul>
     <ul>
+      {% if current.multi_location %}
+      <li>
+        <form method="post" action="/location" class="inline location-switcher">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+          <select name="location_id" aria-label="Location" onchange="this.form.submit()">
+            <option value="all"{% if not current.location_id %} selected{% endif %}>All locations</option>
+            {% for location in current.locations %}<option value="{{ location.id }}"{% if location.id == current.location_id %} selected{% endif %}>{{ location.name }}</option>{% endfor %}
+          </select>
+          <noscript><button type="submit" class="small">Show</button></noscript>
+        </form>
+      </li>
+      {% endif %}
       {% include "_counters.html" %}
       <li><span class="badge mode-{{ topbar.mode|lower }}">{{ topbar.mode }}</span></li>
       <li>

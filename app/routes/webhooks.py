@@ -12,7 +12,7 @@ from app.business_days import utcnow
 from app.enums import MessageStatus, MessagingMode
 from app.messaging.inbound import handle_inbound
 from app.messaging.providers import mask_phone
-from app.models import Message, Shop, ShopSettings
+from app.models import Location, Message, Shop, ShopSettings
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -23,6 +23,23 @@ STATUS_MAP = {"delivered": MessageStatus.DELIVERED, "failed": MessageStatus.FAIL
 
 def _any_live_shop(db: Session) -> bool:
     return db.scalar(select(ShopSettings.id).where(ShopSettings.messaging_mode == MessagingMode.LIVE).limit(1)) is not None
+
+
+def shop_for_number(db: Session, to_e164: str) -> Shop | None:
+    """The LIVE shop that owns the texted number: its own Twilio number or one of its locations' numbers."""
+    if not to_e164:
+        return None
+    shop_id = db.scalar(
+        select(ShopSettings.shop_id).where(ShopSettings.twilio_from_e164 == to_e164, ShopSettings.messaging_mode == MessagingMode.LIVE)
+    )
+    if shop_id is None:
+        shop_id = db.scalar(
+            select(Location.shop_id)
+            .join(ShopSettings, ShopSettings.shop_id == Location.shop_id)
+            .where(Location.twilio_from_e164 == to_e164, ShopSettings.messaging_mode == MessagingMode.LIVE)
+            .limit(1)
+        )
+    return db.get(Shop, shop_id) if shop_id is not None else None
 
 
 def signature_is_valid(request: Request, params: dict) -> bool:
@@ -49,12 +66,9 @@ async def twilio_inbound(request: Request, db: Session = Depends(get_db)):
     if not signature_is_valid(request, params):
         return Response("Invalid signature", status_code=403)
     to_e164 = params.get("To", "")
-    shop_settings = db.scalar(
-        select(ShopSettings).where(ShopSettings.twilio_from_e164 == to_e164, ShopSettings.messaging_mode == MessagingMode.LIVE)
-    )
-    if shop_settings is None:
+    shop = shop_for_number(db, to_e164)
+    if shop is None:
         return _twiml()
-    shop = db.get(Shop, shop_settings.shop_id)
     handle_inbound(
         db,
         shop,

@@ -22,6 +22,64 @@
   <button type="submit">Save</button>
 </form>
 
+{% elif tab == "locations" %}
+{% set active_count = locations|selectattr("is_active")|list|length %}
+{% if not locations %}
+<p>This shop has one location: {{ shop.name }}, {{ shop.phone_e164 }}{% if shop.address %}, {{ shop.address }}{% endif %}.</p>
+<p>Add a second location to split the board, the supplements page and the reports by location. The shop's current phone and address become the location named <strong>Main</strong> (you can rename it), which keeps texting from the shop's Twilio number, and every existing repair order goes there.</p>
+{% else %}
+<p>Each repair order belongs to a location. Texts about it show that location's phone number and go out from its Twilio number (when it has one; otherwise from the shop's number on the Mode tab). Customers can reply to either number. {% if active_count >= 2 %}Use the location menu at the top to switch between locations.{% endif %}</p>
+<table class="compact">
+  <thead><tr><th>Name</th><th>Phone</th><th>Address</th><th>Twilio number</th><th>Review URL</th><th>Open ROs</th><th>Status</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for location in locations %}
+    <tr data-location-id="{{ location.id }}">
+      <td>{{ location.name }}</td><td>{{ location.phone_e164 }}</td><td>{{ location.address or '' }}</td>
+      <td>{{ location.twilio_from_e164 or 'Shop number' }}</td><td>{{ 'Own' if location.review_url else 'Shop URL' }}</td>
+      <td>{{ open_counts[location.id] }}</td><td>{{ 'Open' if location.is_active else 'Closed' }}</td>
+      <td>
+        <details class="inline-form"><summary>Edit</summary>
+          <form method="post" action="/settings">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="locations">
+            <input type="hidden" name="action" value="edit"><input type="hidden" name="location_id" value="{{ location.id }}">
+            <label>Name<input name="name" value="{{ location.name }}" maxlength="120" required></label>
+            <label>Phone<input name="phone" value="{{ location.phone_e164 }}" required></label>
+            <label>Address<input name="address" value="{{ location.address or '' }}" maxlength="200"></label>
+            <label>Twilio number (E.164, optional)<input name="twilio_from_e164" value="{{ location.twilio_from_e164 }}" placeholder="+18185550188"></label>
+            <label>Review URL (optional)<input name="review_url" value="{{ location.review_url }}" placeholder="https://g.page/r/…"></label>
+            <button type="submit" class="small">Save</button>
+          </form>
+        </details>
+        <form method="post" action="/settings" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="locations">
+          <input type="hidden" name="location_id" value="{{ location.id }}">
+          {% if location.is_active %}<input type="hidden" name="action" value="close"><button type="submit" class="small outline secondary">Close</button>
+          {% else %}<input type="hidden" name="action" value="reopen"><button type="submit" class="small outline">Reopen</button>{% endif %}
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+<article>
+  <h4>Add location</h4>
+  <form method="post" action="/settings">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="locations"><input type="hidden" name="action" value="add">
+    <div class="grid">
+      <label>Name<input name="name" maxlength="120" required placeholder="Van Nuys"></label>
+      <label>Phone<input name="phone" required></label>
+      <label>Address<input name="address" maxlength="200"></label>
+    </div>
+    <div class="grid">
+      <label>Twilio number (E.164, optional)<input name="twilio_from_e164" placeholder="+18185550188"></label>
+      <label>Review URL (optional)<input name="review_url" placeholder="https://g.page/r/…"></label>
+    </div>
+    <small>A location's own Twilio number must be on the same Twilio account; with a messaging service, add it to the service's sender pool. Without one, the location's texts come from the shop's number.</small>
+    <button type="submit">Add location</button>
+  </form>
+</article>
+
 {% elif tab == "texting" %}
 <form method="post" action="/settings">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="texting">
@@ -130,11 +188,24 @@
 
 {% elif tab == "users" %}
 <table class="compact">
-  <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+  <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th>{% if locations %}<th>Home location</th>{% endif %}<th>Actions</th></tr></thead>
   <tbody>
     {% for user in users %}
     <tr>
       <td>{{ user.full_name }}</td><td>{{ user.email }}</td><td>{{ user.role }}</td><td>{{ 'Active' if user.is_active else 'Inactive' }}</td>
+      {% if locations %}
+      <td>
+        <form method="post" action="/settings" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="users">
+          <input type="hidden" name="action" value="set_location"><input type="hidden" name="user_id" value="{{ user.id }}">
+          <select name="location_id" aria-label="Home location for {{ user.full_name }}" onchange="this.form.submit()">
+            <option value="">All locations</option>
+            {% for location in locations if location.is_active %}<option value="{{ location.id }}"{% if user.location_id == location.id %} selected{% endif %}>{{ location.name }}</option>{% endfor %}
+          </select>
+          <noscript><button type="submit" class="small">Save</button></noscript>
+        </form>
+      </td>
+      {% endif %}
       <td>
         {% if user.is_active and user.id != current.id %}
         <form method="post" action="/settings" class="inline">
