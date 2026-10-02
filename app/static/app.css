@@ -1,0 +1,51 @@
+/* Body Shop Tracker styles, on top of Pico.css */
+:root { --pico-font-size: 95%; }
+.topbar { border-bottom: 1px solid var(--pico-muted-border-color); margin-bottom: 1rem; flex-wrap: wrap; }
+.topbar ul { flex-wrap: wrap; }
+.counters { display: flex; gap: .4rem; flex-wrap: wrap; }
+.counter { font-size: .85rem; padding: .15rem .5rem; border-radius: .3rem; background: var(--pico-secondary-background); color: var(--pico-secondary-inverse); white-space: nowrap; }
+.badge { font-size: .8rem; padding: .15rem .5rem; border-radius: .3rem; color: #fff; font-weight: 600; }
+.mode-demo { background: #6b7280; }
+.mode-live { background: #c62828; }
+form.inline { display: inline; margin: 0; }
+form.inline button, button.small { padding: .2rem .6rem; font-size: .85rem; margin: 0; width: auto; }
+.error { color: #c62828; font-weight: 600; }
+.notice { color: #2e7d32; font-weight: 600; }
+.login-card { max-width: 420px; margin: 3rem auto; }
+
+/* Board */
+.board { display: flex; gap: .75rem; overflow-x: auto; align-items: flex-start; padding-bottom: 1rem; }
+.board-column { flex: 0 0 240px; background: var(--pico-card-sectioning-background-color); border-radius: .5rem; padding: .5rem; }
+.board-column h3 { font-size: .95rem; margin: .25rem 0 .5rem; }
+.card { background: var(--pico-card-background-color); border: 1px solid var(--pico-muted-border-color); border-radius: .4rem; padding: .5rem; margin-bottom: .5rem; cursor: pointer; font-size: .85rem; }
+.card p { margin: 0 0 .2rem; }
+.card form { margin: .3rem 0 0; display: flex; gap: .3rem; }
+.card select { padding: .1rem .3rem; font-size: .8rem; margin: 0; height: auto; }
+.tag { display: inline-block; font-size: .75rem; padding: .05rem .4rem; border-radius: .25rem; margin: .1rem .1rem 0 0; background: #e5e7eb; color: #111827; }
+.tag-reply { background: #1565c0; color: #fff; }
+.tag-notexts { background: #6b7280; color: #fff; }
+.tag-due { background: #c62828; color: #fff; }
+
+/* Aging buckets (Section 8) */
+.bucket-FRESH { background: #2e7d32; color: #fff; }
+.bucket-WATCH { background: #f9a825; color: #111; }
+.bucket-LATE { background: #ef6c00; color: #fff; }
+.bucket-CRITICAL { background: #c62828; color: #fff; }
+td.bucket-FRESH, td.bucket-WATCH, td.bucket-LATE, td.bucket-CRITICAL { font-weight: 600; }
+tr.due td { font-weight: 700; }
+
+/* Messages thread */
+.thread { display: flex; flex-direction: column; gap: .4rem; }
+.msg { max-width: 75%; padding: .4rem .6rem; border-radius: .5rem; font-size: .9rem; }
+.msg.outbound { align-self: flex-end; background: #e3f2fd; color: #0d47a1; }
+.msg.inbound { align-self: flex-start; background: #f1f5f9; color: #111827; }
+.msg small { display: block; opacity: .8; }
+.msg form { display: inline; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+table.compact td, table.compact th { padding: .3rem .5rem; font-size: .85rem; }
+.row-errors { color: #c62828; }
+details.inline-form { display: inline-block; margin: 0 .2rem; }
+details.inline-form summary { font-size: .85rem; }
+.preview { font-size: .85rem; background: #f8fafc; color: #111827; padding: .4rem; border-radius: .3rem; }
+.tabs a { margin-right: 1rem; }
+.tabs a.active { font-weight: 700; text-decoration: underline; }
