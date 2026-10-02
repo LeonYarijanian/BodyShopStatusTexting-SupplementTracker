@@ -54,6 +54,16 @@ When a customer asks you to delete their data, an admin opens one of their ROs a
 
 Settings > Supplements has a **Daily follow-up digest**: on business days at the send time (06:00 to 10:00), up to 5 recipients get 1 email listing every supplement whose follow-up is due, with the adjuster's contact details, the amount and how long it has waited. No email goes out when nothing is due. Emails are written to `./outbox` until `ALLOW_LIVE_EMAIL=true`, `SMTP_HOST` and `EMAIL_FROM` are set in `.env`; any SMTP provider works.
 
+## Estimating software sync (not built yet: needs vendor access)
+
+Section 16 item 4, pulling ROs and stages from CCC ONE, Mitchell or Audatex, cannot be built without access only the business can get:
+
+- **CCC ONE:** third-party apps receive estimate data through the [CCC Secure Share](https://www.cccsecureshare.com/) network as CIECA BMS messages over CCC's API. The business has to apply as an app provider and is placed in an App Category that decides which estimate fields it may receive.
+- **Mitchell and Audatex (Qapter):** shops export estimates as CIECA EMS or BMS files to a folder that a management system reads. Mitchell also runs partner programs for cloud integrations.
+- **CIECA standards:** the EMS and BMS specifications come from CIECA membership.
+
+Once you have Secure Share developer access or a CIECA BMS sample set from a pilot shop, the import maps onto what already exists: each estimate creates or updates an RO exactly like a CSV import row (`app/csv_import.py`), and stage changes go through `change_stage`, so texts follow the usual rules. Until then, the CSV import is the bridge.
+
 ## Pitch demo
 
 After `alembic upgrade head` and `python -m app.seed --demo`, log in as `admin@demo.local` with password `demo-password-123` and follow the 7-step walkthrough in SPEC.md Section 14. Everything works offline: HTMX and Pico.css are vendored in `app/static/`.
