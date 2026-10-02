@@ -17,12 +17,13 @@ from app.enums import (
     TERMINAL_STAGES,
     ConsentMethod,
     ConsentStatus,
+    MessageDirection,
     PayerType,
     Role,
     Stage,
 )
 from app.messaging.templates import parse_us_phone
-from app.models import Adjuster, Consent, Customer, Insurer, RepairOrder, StageEvent, Supplement, User
+from app.models import Adjuster, Consent, Customer, Insurer, Message, RepairOrder, StageEvent, Supplement, User
 from app.money import dollars_to_cents
 from app.routes import is_htmx, render
 
@@ -506,19 +507,25 @@ def timeline(db: Session, ro: RepairOrder) -> list[dict]:
         label = STAGE_LABELS[event.to_stage] if event.from_stage is None else f"{STAGE_LABELS[event.from_stage]} → {STAGE_LABELS[event.to_stage]}"
         detail = f"by {event.changed_by.full_name}" + (f" ({event.note})" if event.note else "")
         items.append({"at": event.changed_at, "id": event.id, "kind": "Stage", "text": label, "detail": detail})
+    for message in db.scalars(select(Message).where(Message.repair_order_id == ro.id)).all():
+        direction = "Text in" if message.direction == MessageDirection.INBOUND else "Text out"
+        items.append({"at": message.created_at, "id": message.id, "kind": direction, "text": message.body, "detail": message.status.value})
     return sorted(items, key=lambda item: (item["at"], item["id"]), reverse=True)
 
 
 def ro_detail_context(db: Session, current: CurrentUser, ro: RepairOrder) -> dict:
+    from app.routes.messages_routes import messages_panel_context
+
     now = utcnow()
-    return {
-        "ro": ro,
+    context = {
         "customer": ro.customer,
         "days_in_shop": days_in_shop(ro, now),
         "payer": payer_label(ro),
         "stages": list(Stage),
         "timeline": timeline(db, ro),
     }
+    context.update(messages_panel_context(db, current, ro))
+    return context
 
 
 @router.get("/ro/{ro_id}")

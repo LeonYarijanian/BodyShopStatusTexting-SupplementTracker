@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Messages{% endblock %}
+{% block content %}
+<h2>Message log</h2>
+<form method="get" action="/messages" class="grid">
+  <select name="direction" aria-label="Direction">
+    <option value="">All directions</option>
+    {% for d in directions %}<option value="{{ d.value }}"{% if filters.direction == d.value %} selected{% endif %}>{{ d.value }}</option>{% endfor %}
+  </select>
+  <select name="status" aria-label="Status">
+    <option value="">All statuses</option>
+    {% for s in statuses %}<option value="{{ s.value }}"{% if filters.status == s.value %} selected{% endif %}>{{ s.value }}</option>{% endfor %}
+  </select>
+  <input type="date" name="date_from" value="{{ filters.date_from }}" aria-label="From">
+  <input type="date" name="date_to" value="{{ filters.date_to }}" aria-label="To">
+  <button type="submit">Filter</button>
+</form>
+<p>{{ total }} message{{ '' if total == 1 else 's' }}. Page {{ page }} of {{ pages }}.</p>
+<div class="overflow-auto">
+<table class="compact striped">
+  <thead><tr><th>Time</th><th>Direction</th><th>Kind</th><th>Status</th><th>To</th><th>From</th><th>RO</th><th>Body</th><th>Error</th></tr></thead>
+  <tbody>
+    {% for m in rows %}
+    <tr>
+      <td>{{ m.created_at|local_dt(tz) }}</td>
+      <td>{{ m.direction }}</td>
+      <td>{{ m.kind }}</td>
+      <td>{{ m.status }}</td>
+      <td>{{ m.to_e164 }}</td>
+      <td>{{ m.from_e164 }}</td>
+      <td>{% if m.repair_order_id %}<a href="/ro/{{ m.repair_order_id }}">{{ ro_numbers.get(m.repair_order_id, m.repair_order_id) }}</a>{% endif %}</td>
+      <td>{{ m.body }}</td>
+      <td>{{ m.error_text or '' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9">No messages.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<nav>
+  {% set qs = 'direction=' ~ filters.direction ~ '&status=' ~ filters.status ~ '&date_from=' ~ filters.date_from ~ '&date_to=' ~ filters.date_to %}
+  {% if page > 1 %}<a href="/messages?{{ qs }}&page={{ page - 1 }}">← Newer</a>{% endif %}
+  {% if page < pages %}<a href="/messages?{{ qs }}&page={{ page + 1 }}">Older →</a>{% endif %}
+</nav>
+{% endblock %}
