@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}CSV import{% endblock %}
+{% block content %}
+<h2>CSV import</h2>
+<p>Load existing repair orders from a CSV file. The import never sends a text, and it saves every row or none. Upload, check the dry run, then commit.</p>
+<details>
+  <summary>Columns</summary>
+  <p><code>{{ columns|join(",") }}</code></p>
+  <p>Required: ro_number, checked_in_date, customer_first_name, customer_phone, vehicle_year, vehicle_make, vehicle_model, payer_type, original_estimate, and insurer_name for INSURANCE rows. UTF-8, comma-separated, at most 2 MB and 1,000 data rows.</p>
+</details>
+
+{% if committed is not none %}
+<p class="notice" role="status">Imported {{ committed }} repair order{{ '' if committed == 1 else 's' }}. No texts were sent.</p>
+{% endif %}
+{% if file_error %}<p class="error" role="alert">{{ file_error }}</p>{% endif %}
+
+<form method="post" action="/import" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="action" value="dry_run">
+  <label>CSV file<input type="file" name="file" accept=".csv,text/csv" required></label>
+  <label><input type="checkbox" name="create_missing_insurers" value="yes"{% if create_missing %} checked{% endif %}> Create missing insurers</label>
+  <button type="submit">Upload and dry run</button>
+</form>
+
+{% if results is not none %}
+{% set error_count = results|rejectattr("ok")|list|length %}
+<h3>Dry run: {{ results|length }} row{{ '' if results|length == 1 else 's' }}, {{ error_count }} with errors</h3>
+<table class="compact">
+  <thead><tr><th>Row</th><th>RO number</th><th>Result</th></tr></thead>
+  <tbody>
+    {% for r in results %}
+    <tr>
+      <td>{{ r.row_number }}</td>
+      <td>{{ r.values.ro_number }}</td>
+      <td>{% if r.ok %}<span class="row-ok">OK</span>{% for note in r.notes %} · {{ note }}{% endfor %}
+          {% else %}<ul class="row-errors">{% for e in r.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if upload_id %}
+<form method="post" action="/import">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="action" value="commit">
+  <input type="hidden" name="upload_id" value="{{ upload_id }}">
+  {% if create_missing %}<input type="hidden" name="create_missing_insurers" value="yes">{% endif %}
+  <button type="submit"{% if error_count %} disabled{% endif %}>Commit {{ results|length }} row{{ '' if results|length == 1 else 's' }}</button>
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}
