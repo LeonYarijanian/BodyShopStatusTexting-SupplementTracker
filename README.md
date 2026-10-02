@@ -50,6 +50,10 @@ To run the app against any Postgres without Docker, set `DATABASE_URL=postgresql
 
 When a customer asks you to delete their data, an admin opens one of their ROs and uses **Delete this customer's personal data** at the bottom of the page (type `DELETE` to confirm). This removes their name, phone, email, consent history, message text, VIN and claim numbers from every RO they have, and cancels any scheduled text. The ROs themselves stay (vehicle, amounts, stages and dates) so reports and cycle times stay correct. It cannot be undone. If the same person comes back later, they are a new customer and must give consent again.
 
+## Daily follow-up digest
+
+Settings > Supplements has a **Daily follow-up digest**: on business days at the send time (06:00 to 10:00), up to 5 recipients get 1 email listing every supplement whose follow-up is due, with the adjuster's contact details, the amount and how long it has waited. No email goes out when nothing is due. Emails are written to `./outbox` until `ALLOW_LIVE_EMAIL=true`, `SMTP_HOST` and `EMAIL_FROM` are set in `.env`; any SMTP provider works.
+
 ## Pitch demo
 
 After `alembic upgrade head` and `python -m app.seed --demo`, log in as `admin@demo.local` with password `demo-password-123` and follow the 7-step walkthrough in SPEC.md Section 14. Everything works offline: HTMX and Pico.css are vendored in `app/static/`.

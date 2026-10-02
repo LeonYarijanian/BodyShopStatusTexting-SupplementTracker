@@ -16,6 +16,18 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: str = ""
     TWILIO_AUTH_TOKEN: str = ""
     PUBLIC_BASE_URL: str = ""
+    # Email (Section 16 roadmap). Without ALLOW_LIVE_EMAIL=true and SMTP_HOST, emails go to ./outbox only.
+    ALLOW_LIVE_EMAIL: bool = False
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_STARTTLS: bool = True
+    EMAIL_FROM: str = ""
+
+    @property
+    def live_email(self) -> bool:
+        return bool(self.ALLOW_LIVE_EMAIL and self.SMTP_HOST and self.EMAIL_FROM)
 
     def secret_key_problem(self) -> str | None:
         if not self.APP_SECRET_KEY:

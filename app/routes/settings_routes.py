@@ -25,6 +25,8 @@ from app.messaging.templates import (
     template_variables,
     validate_template,
 )
+from app.digest import MAX_RECIPIENTS as MAX_DIGEST_RECIPIENTS
+from app.mailer import valid_email
 from app.models import Adjuster, Insurer, Shop, ShopSettings, User
 from app.routes import render, shop_settings
 
@@ -160,13 +162,31 @@ def save_texting(settings: ShopSettings, form) -> None:
     settings.stage_templates = templates
 
 
+def parse_email_list(text: str, field: str, limit: int) -> list[str]:
+    emails = [part.strip().lower() for part in text.replace("\n", ",").replace(";", ",").split(",") if part.strip()]
+    for email in emails:
+        if not valid_email(email):
+            raise SettingsError(f"{field}: {email} is not a valid email address.")
+    if len(emails) > limit:
+        raise SettingsError(f"{field} can have at most {limit} emails.")
+    return list(dict.fromkeys(emails))
+
+
 def save_supplements(settings: ShopSettings, form) -> None:
     interval = parse_int(_text(form, "default_follow_up_interval_business_days"), "default_follow_up_interval_business_days", 1, 10)
     due_time = parse_hhmm(_text(form, "follow_up_due_time"), "follow_up_due_time", "06:00", "17:00")
     warning = parse_int(_text(form, "concentration_warning_pct"), "concentration_warning_pct", 10, 90)
+    digest_enabled = _checked(form, "digest_enabled")
+    recipients = parse_email_list(_text(form, "digest_recipients"), "digest_recipients", MAX_DIGEST_RECIPIENTS)
+    digest_time = parse_hhmm(_text(form, "digest_send_time") or "07:30", "digest_send_time", "06:00", "10:00")
+    if digest_enabled and not recipients:
+        raise SettingsError("digest_recipients needs at least 1 email to turn the daily digest on.")
     settings.default_follow_up_interval_business_days = interval
     settings.follow_up_due_time = due_time
     settings.concentration_warning_pct = warning
+    settings.digest_enabled = digest_enabled
+    settings.digest_recipients = recipients
+    settings.digest_send_time = digest_time
 
 
 def save_insurer(db: Session, current: CurrentUser, form) -> None:

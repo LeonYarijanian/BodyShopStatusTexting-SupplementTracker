@@ -60,6 +60,13 @@
   <label>Default follow-up interval, business days (1 to 10)<input name="default_follow_up_interval_business_days" type="number" value="{{ settings.default_follow_up_interval_business_days }}" required></label>
   <label>Follow-up due time (06:00 to 17:00)<input name="follow_up_due_time" value="{{ settings.follow_up_due_time.strftime('%H:%M') }}" required></label>
   <label>Concentration warning above this share of delivered revenue, % (10 to 90)<input name="concentration_warning_pct" type="number" value="{{ settings.concentration_warning_pct }}" required></label>
+  <fieldset>
+    <legend><strong>Daily follow-up digest</strong></legend>
+    <p><small>On business days, 1 email listing every supplement whose follow-up is due. No email when nothing is due.</small></p>
+    <label><input type="checkbox" name="digest_enabled" value="yes"{% if settings.digest_enabled %} checked{% endif %}> Send the daily digest</label>
+    <label>Recipients (up to 5, separated by commas)<input name="digest_recipients" value="{{ settings.digest_recipients|join(', ') }}"></label>
+    <label>Send time (06:00 to 10:00)<input name="digest_send_time" value="{{ settings.digest_send_time.strftime('%H:%M') }}"></label>
+  </fieldset>
   <button type="submit">Save</button>
 </form>
 

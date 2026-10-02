@@ -5,6 +5,7 @@ import datetime as dt
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -105,6 +106,11 @@ class ShopSettings(TimestampMixin, Base):
     a2p_10dlc_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     consent_script_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     twilio_handles_keyword_replies: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Section 16 item 3: daily email digest of follow-ups due.
+    digest_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    digest_recipients: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    digest_send_time: Mapped[dt.time] = mapped_column(Time, nullable=False, default=dt.time(7, 30))
+    digest_last_sent_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
 
     shop: Mapped[Shop] = relationship(back_populates="settings")
 

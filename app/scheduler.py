@@ -11,16 +11,18 @@ log = logging.getLogger(__name__)
 
 def run_job(session_factory) -> None:
     from app.csv_import import delete_old_uploads
+    from app.digest import run_digests
     from app.messaging.engine import run_sender
 
-    db = session_factory()
-    try:
-        run_sender(utcnow(), db)
-    except Exception:  # keep the scheduler alive; the next run retries
-        log.exception("Sender job failed")
-        db.rollback()
-    finally:
-        db.close()
+    for name, step in (("Sender", run_sender), ("Digest", run_digests)):
+        db = session_factory()
+        try:
+            step(utcnow(), db)
+        except Exception:  # keep the scheduler alive; the next run retries
+            log.exception("%s job failed", name)
+            db.rollback()
+        finally:
+            db.close()
     try:
         delete_old_uploads(utcnow())
     except Exception:
