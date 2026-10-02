@@ -52,3 +52,9 @@ details.inline-form summary { font-size: .85rem; }
 .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .page-header h2 { margin: 0; }
 .msg-photo { display: block; max-width: 220px; max-height: 220px; border-radius: .3rem; margin-bottom: .3rem; }
+.status-page { max-width: 560px; }
+.status-page h1 { font-size: 1.6rem; }
+.milestones { list-style: none; padding: 0; }
+.milestones li { padding: .4rem .6rem; border-left: 4px solid var(--pico-muted-border-color); margin-bottom: .3rem; color: var(--pico-muted-color); }
+.milestones li.done { border-left-color: #2e7d32; color: inherit; }
+.milestones li.current { border-left-color: #1565c0; font-weight: 700; color: inherit; }

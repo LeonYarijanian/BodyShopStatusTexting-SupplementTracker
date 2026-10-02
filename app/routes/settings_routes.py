@@ -30,6 +30,7 @@ from app.digest import MAX_RECIPIENTS as MAX_DIGEST_RECIPIENTS
 from app.mailer import valid_email
 from app.models import Adjuster, Insurer, Shop, ShopSettings, User
 from app.routes import render, shop_settings
+from app.status_page import PREVIEW_STATUS_LINK_TOKEN, status_url
 
 router = APIRouter()
 
@@ -103,6 +104,7 @@ def preview_template(shop: Shop, settings: ShopSettings, template: str) -> str:
         vehicle=PREVIEW_VEHICLE,
         ro_number=PREVIEW_RO_NUMBER,
         review_url=settings.review_url,
+        status_link=status_url(PREVIEW_STATUS_LINK_TOKEN),
     )
     return add_identification(replace_variables(template, variables), shop.name)
 

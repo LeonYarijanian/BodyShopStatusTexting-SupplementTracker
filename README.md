@@ -78,6 +78,10 @@ Each submitted supplement has a **Draft email to adjuster** button. With `ANTHRO
 
 Nothing is sent until a person clicks **Approve and send** on the draft page, after reading and editing it. Sending goes through the email settings (`./outbox` until live email is on), sets Reply-To to the sender, and logs an Email follow-up, which moves the next due date. Drafting an email costs a fraction of a cent per draft at current Claude pricing.
 
+## Customer status page
+
+Every RO has a status page at `PUBLIC_BASE_URL/s/<token>`, where the token is long and random. Put `{status_link}` in any stage template (Settings > Texting) to send it, or copy it from the RO page. The page shows the shop, the vehicle, the current stage, progress through the main milestones and the stage history, with the shop's phone number. It never shows prices, the insurer, claim or RO numbers, the customer's last name or phone number. It is not indexed by search engines or cached, and it stops working 30 days after pickup, when the RO is cancelled, or when the customer's data is deleted.
+
 ## Pitch demo
 
 After `alembic upgrade head` and `python -m app.seed --demo`, log in as `admin@demo.local` with password `demo-password-123` and follow the 7-step walkthrough in SPEC.md Section 14. Everything works offline: HTMX and Pico.css are vendored in `app/static/`.

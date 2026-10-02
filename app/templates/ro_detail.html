@@ -15,6 +15,7 @@
         <th>Adjuster</th><td>{{ ro.adjuster.full_name if ro.adjuster else '—' }}</td></tr>
     <tr><th>Claim number</th><td>{{ ro.claim_number or '—' }}</td>
         <th>Original estimate</th><td>{{ ro.original_estimate_cents|money }}</td></tr>
+    {% if status_link %}<tr><th>Customer status page</th><td colspan="3"><a href="{{ status_link }}" target="_blank" rel="noopener">{{ status_link }}</a> <small>(use {status_link} in a text template, or paste it into a text)</small></td></tr>{% endif %}
     <tr><th>Checked in</th><td>{{ ro.checked_in_at|local_dt(tz) }}</td>
         <th>Final invoice</th><td>{{ ro.final_invoice_cents|money if ro.final_invoice_cents is not none else '—' }}{% if ro.delivered_at %} · delivered {{ ro.delivered_at|local_dt(tz) }}{% endif %}</td></tr>
   </tbody>

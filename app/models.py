@@ -207,6 +207,8 @@ class RepairOrder(TimestampMixin, Base):
     checked_in_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, nullable=False)
     delivered_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
     needs_reply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Section 16 item 8: the random part of the customer's status page link.
+    status_token: Mapped[str | None] = mapped_column(String(40), nullable=True, unique=True, index=True)
 
     customer: Mapped[Customer] = relationship()
     insurer: Mapped[Insurer | None] = relationship()

@@ -17,6 +17,7 @@ from app.messaging.templates import parse_us_phone
 from app.models import Adjuster, Consent, Customer, Insurer, RepairOrder, Shop, StageEvent, User
 from app.money import dollars_to_cents
 from app.routes.repair_orders import ROError, validate_vehicle_year, validate_vin
+from app.status_page import ensure_status_token
 
 IMPORT_TMP_DIR = Path("import_tmp")
 MAX_BYTES = 2 * 1024 * 1024
@@ -325,6 +326,7 @@ def _save_row(db: Session, shop: Shop, user: User, clean: dict, now: dt.datetime
         current_stage=clean["stage"],
         checked_in_at=clean["checked_in_at"],
     )
+    ensure_status_token(ro)
     db.add(ro)
     db.flush()
     db.add(

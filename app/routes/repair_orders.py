@@ -26,6 +26,7 @@ from app.enums import (
     SupplementEventType,
 )
 from app.messaging.templates import parse_us_phone
+from app.status_page import ensure_status_token, link_is_active, status_url
 from app.models import Adjuster, Consent, Customer, Insurer, Message, RepairOrder, StageEvent, Supplement, SupplementEvent, User
 from app.money import dollars_to_cents
 from app.routes import is_htmx, render, shop_settings
@@ -313,6 +314,7 @@ def create_repair_order(db: Session, current: CurrentUser, clean: dict, now: dt.
         current_stage=Stage.CHECKED_IN,
         checked_in_at=clean["checked_in_at"],
     )
+    ensure_status_token(ro)
     db.add(ro)
     db.flush()
     if clean.get("consent"):
@@ -570,8 +572,12 @@ def ro_detail_context(db: Session, current: CurrentUser, ro: RepairOrder) -> dic
     from app.routes.supplements_routes import ro_supplements_context
 
     now = utcnow()
+    if not ro.status_token and ro.customer.anonymized_at is None:
+        ensure_status_token(ro)
+        db.commit()
     context = {
         "customer": ro.customer,
+        "status_link": status_url(ro.status_token) if ro.status_token and link_is_active(ro, now) else None,
         "days_in_shop": days_in_shop(ro, now),
         "payer": payer_label(ro),
         "stages": list(Stage),

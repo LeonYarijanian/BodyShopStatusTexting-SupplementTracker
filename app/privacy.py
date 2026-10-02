@@ -59,6 +59,7 @@ def anonymize_customer(db: Session, customer: Customer, now: dt.datetime) -> dic
         ro.vin = None
         ro.claim_number = None
         ro.needs_reply = False
+        ro.status_token = None  # the status page link stops working
 
     customer.first_name = DELETED_NAME
     customer.last_name = None

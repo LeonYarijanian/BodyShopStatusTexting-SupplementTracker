@@ -25,6 +25,7 @@ from app.routes import (
     repair_orders,
     reports_routes,
     settings_routes,
+    status_routes,
     supplements_routes,
     webhooks,
 )
@@ -81,6 +82,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         privacy_routes,
         media_routes,
         adjuster_email_routes,
+        status_routes,
         webhooks,
     ):
         app.include_router(module.router)

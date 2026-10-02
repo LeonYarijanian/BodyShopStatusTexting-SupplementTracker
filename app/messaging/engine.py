@@ -26,6 +26,7 @@ from app.messaging.templates import (
     template_variables,
 )
 from app.models import Consent, Customer, Message, RepairOrder, Shop, ShopSettings, StageEvent
+from app.status_page import ensure_status_token, status_url
 
 SENT_OK = (MessageStatus.SENT, MessageStatus.DELIVERED)
 # Automatic keyword replies skip the consent, quiet-hours, cool-off and cap checks.
@@ -106,6 +107,7 @@ def ro_variables(shop: Shop, shop_settings: ShopSettings, ro: RepairOrder) -> di
         ro_number=ro.ro_number,
         # With review requests on, repair updates stay informational: the review link goes only in the review request.
         review_url="" if shop_settings.review_request_enabled else shop_settings.review_url,
+        status_link=status_url(ensure_status_token(ro)),
     )
 
 

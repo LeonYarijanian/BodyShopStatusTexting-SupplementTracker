@@ -52,7 +52,7 @@ DEFAULT_TEXT_ENABLED: dict[Stage, bool] = {
 # Stages whose text can be switched on or off and edited. CANCELLED never texts.
 TEXTABLE_STAGES = tuple(s for s in Stage if s != Stage.CANCELLED)
 
-KNOWN_VARIABLES = ("first_name", "shop_name", "shop_phone", "vehicle", "ro_number", "review_link_sentence")
+KNOWN_VARIABLES = ("first_name", "shop_name", "shop_phone", "vehicle", "ro_number", "review_link_sentence", "status_link")
 MAX_TEMPLATE_LENGTH = 250
 MAX_TEXT_LENGTH = 320
 STOP_SUFFIX = "Reply STOP to opt out."
@@ -122,7 +122,9 @@ def review_link_sentence(review_url: str) -> str:
     return f" {REVIEW_SENTENCE}{review_url}" if review_url else ""
 
 
-def template_variables(*, first_name: str, shop_name: str, shop_phone_e164: str, vehicle: str, ro_number: str, review_url: str) -> dict[str, str]:
+def template_variables(
+    *, first_name: str, shop_name: str, shop_phone_e164: str, vehicle: str, ro_number: str, review_url: str, status_link: str = ""
+) -> dict[str, str]:
     return {
         "first_name": first_name,
         "shop_name": shop_name,
@@ -130,6 +132,8 @@ def template_variables(*, first_name: str, shop_name: str, shop_phone_e164: str,
         "vehicle": vehicle,
         "ro_number": ro_number,
         "review_link_sentence": review_link_sentence(review_url),
+        # Section 16 item 8: the customer's status page for this RO.
+        "status_link": status_link,
     }
 
 
