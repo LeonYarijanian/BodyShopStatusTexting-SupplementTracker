@@ -58,6 +58,8 @@ def render(request: Request, name: str, db: Session | None = None, current: Curr
     context["request"] = request
     context["csrf_token"] = csrf_token(request)
     context["current"] = current
+    flash = request.session.pop("flash", None) if "session" in request.scope else None
+    context.setdefault("flash", flash)
     if current is not None and db is not None:
         context.setdefault("topbar", topbar(db, current))
         context.setdefault("tz", current.shop.timezone)

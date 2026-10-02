@@ -1,5 +1,50 @@
 {% extends "base.html" %}
 {% block title %}RO {{ ro.ro_number }}{% endblock %}
 {% block content %}
-<h2>RO {{ ro.ro_number }}</h2>
+<header class="page-header">
+  <h2>RO {{ ro.ro_number }} · {{ ro.vehicle }}</h2>
+  <a href="/ro/{{ ro.id }}/edit" role="button" class="secondary">Edit RO</a>
+</header>
+<table class="compact">
+  <tbody>
+    <tr><th>Customer</th><td>{{ customer.first_name }} {{ customer.last_name or '' }} · {{ customer.phone_e164 }}</td>
+        <th>Current stage</th><td><strong>{{ STAGE_LABELS[ro.current_stage] }}</strong></td></tr>
+    <tr><th>Payer</th><td>{{ payer }}</td>
+        <th>Days in shop</th><td>{{ days_in_shop }}d</td></tr>
+    <tr><th>Insurer</th><td>{{ ro.insurer.name if ro.insurer else '—' }}</td>
+        <th>Adjuster</th><td>{{ ro.adjuster.full_name if ro.adjuster else '—' }}</td></tr>
+    <tr><th>Claim number</th><td>{{ ro.claim_number or '—' }}</td>
+        <th>Original estimate</th><td>{{ ro.original_estimate_cents|money }}</td></tr>
+    <tr><th>Checked in</th><td>{{ ro.checked_in_at|local_dt(tz) }}</td>
+        <th>Final invoice</th><td>{{ ro.final_invoice_cents|money if ro.final_invoice_cents is not none else '—' }}{% if ro.delivered_at %} · delivered {{ ro.delivered_at|local_dt(tz) }}{% endif %}</td></tr>
+  </tbody>
+</table>
+
+<section>
+  <h3>Stage</h3>
+  <form method="post" action="/ro/{{ ro.id }}/stage" class="grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="source" value="ro">
+    <select name="stage" aria-label="Stage">
+      {% for s in stages %}<option value="{{ s.value }}"{% if s == ro.current_stage %} selected{% endif %}>{{ STAGE_LABELS[s] }}</option>{% endfor %}
+    </select>
+    <input name="final_invoice" inputmode="decimal" placeholder="Final invoice $ (needed for Delivered)" value="{{ ro.final_invoice_cents|dollars_input }}">
+    <button type="submit">Move</button>
+  </form>
+</section>
+
+{% block panels %}{% endblock %}
+
+<section>
+  <h3>Timeline</h3>
+  <table class="compact">
+    <tbody>
+      {% for item in timeline %}
+      <tr><td>{{ item.at|local_dt(tz) }}</td><td>{{ item.kind }}</td><td>{{ item.text }}</td><td>{{ item.detail }}</td></tr>
+      {% else %}
+      <tr><td>Nothing yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
 {% endblock %}

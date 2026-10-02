@@ -96,6 +96,13 @@ def login(client: TestClient, email: str, password: str = PASSWORD) -> str:
     return get_csrf(client, "/")
 
 
+def login_as(app, email: str, password: str = PASSWORD) -> TestClient:
+    """A new client logged in at the current (possibly frozen) time; `client.csrf` holds its token."""
+    client = TestClient(app)
+    client.csrf = login(client, email, password)
+    return client
+
+
 @pytest.fixture
 def admin_client(client, base):
     client.csrf = login(client, "admin@test.local")

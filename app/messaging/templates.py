@@ -86,6 +86,17 @@ def validate_template(text: str) -> None:
         raise TemplateError(f"Template is longer than {MAX_TEMPLATE_LENGTH} characters ({len(text)}).")
 
 
+def parse_us_phone(text: str) -> str:
+    """Parse any US phone format to E.164. Raises ValueError for an invalid number."""
+    try:
+        parsed = phonenumbers.parse((text or "").strip(), "US")
+    except phonenumbers.NumberParseException as exc:
+        raise ValueError(f"Invalid phone number: {text}") from exc
+    if not phonenumbers.is_valid_number(parsed):
+        raise ValueError(f"Invalid phone number: {text}")
+    return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+
+
 def format_us_phone(phone_e164: str) -> str:
     """+18185550100 -> (818) 555-0100."""
     try:

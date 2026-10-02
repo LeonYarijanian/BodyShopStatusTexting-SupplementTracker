@@ -37,6 +37,7 @@
   </nav>
 {% endif %}
   <main class="container-fluid">
+    {% if flash %}<p class="{{ 'notice' if flash.kind == 'notice' else 'error' }}" role="alert">{{ flash.message }}</p>{% endif %}
     {% block content %}{% endblock %}
   </main>
 </body>

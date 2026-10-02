@@ -49,3 +49,5 @@ details.inline-form summary { font-size: .85rem; }
 .preview { font-size: .85rem; background: #f8fafc; color: #111827; padding: .4rem; border-radius: .3rem; }
 .tabs a { margin-right: 1rem; }
 .tabs a.active { font-weight: 700; text-decoration: underline; }
+.page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.page-header h2 { margin: 0; }

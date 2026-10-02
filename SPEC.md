@@ -369,7 +369,7 @@ Active stages are every stage except `DELIVERED` and `CANCELLED`. Those two are 
 | `{shop_phone}` | `shops.phone_e164` formatted as US national | `(818) 555-0100` |
 | `{vehicle}` | `vehicle_year` + space + `vehicle_make` + space + `vehicle_model` | `2021 Honda Accord` |
 | `{ro_number}` | `repair_orders.ro_number` | `24-1187` |
-| `{review_link_sentence}` | If `review_url` is set: a space + `If you have a minute, a review helps us a lot:` + the URL. Otherwise an empty string. | `If you have a minute, a review helps us a lot: https://g.page/r/example` |
+| `{review_link_sentence}` | If `review_url` is set: a space + `If you have a minute, a review helps us a lot: ` + the URL. Otherwise an empty string. | `If you have a minute, a review helps us a lot: https://g.page/r/example` |
 
 ### Rendering rules, applied in this order
 
@@ -924,7 +924,7 @@ All times are local on Monday 2026-10-05 unless stated, using RO 24-1187.
 | T2.10 | `PAINT` at 13:00, `BODY_REPAIR` at 14:00, `PAINT` at 15:00, running the sender after each | Exactly 1 `PAINT` message and 1 `BODY_REPAIR` message on the RO |
 | T2.11 | Move to `TEARDOWN` | 0 new messages |
 | T2.12 | New opted-in customer `+18185550144` with no prior messages; set the `CHECKED_IN` template to `{shop_name}: Your {vehicle} is checked in.`; create an RO and run the sender; then move to `PARTS_ORDERED` and run it again | First text ends with `Reply STOP to opt out.` Second text does not contain `Reply STOP to opt out.` |
-| T2.13 | Manual text of exactly 320 `x` characters at 13:00 | Body = `Test Collision:` (16 characters) + 320 = 336 characters, so status is `FAILED` with `error_text` = `BODY_TOO_LONG` |
+| T2.13 | Manual text of exactly 320 `x` characters at 13:00 | Body = `Test Collision: ` (16 characters) + 320 = 336 characters, so status is `FAILED` with `error_text` = `BODY_TOO_LONG` |
 | T2.14 | Inbound `When will it be ready?` from Maria | 1 message `INBOUND_REPLY`, `RECEIVED`, attached to 24-1187; `needs_reply` = true; outbound count unchanged |
 | T2.15 | Manual text at 21:00 | `SCHEDULED` with `scheduled_send_at` = 2026-10-06T15:00:00Z |
 | T2.16 | Render `{shop_name}: Your {vehicle} is in paint.` for 24-1187 | Exactly `Test Collision: Your 2021 Honda Accord is in paint.` |

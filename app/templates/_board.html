@@ -1,0 +1,30 @@
+<div id="board">
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  <div class="board">
+    {% for stage, cards in columns.items() %}
+    <section class="board-column" data-stage="{{ stage.value }}">
+      <h3>{{ STAGE_LABELS[stage] }} <small>({{ cards|length }})</small></h3>
+      {% for card in cards %}
+      <article class="card" data-ro-id="{{ card.ro.id }}" onclick="if (!event.target.closest('form')) { window.location = '/ro/{{ card.ro.id }}'; }">
+        <p><a href="/ro/{{ card.ro.id }}"><strong>{{ card.ro.ro_number }}</strong></a> · {{ card.customer_name }}</p>
+        <p>{{ card.ro.vehicle }}</p>
+        <p><span class="days-in-shop">{{ card.days_in_shop }}d</span> · {{ card.payer }}</p>
+        <p>
+          {% if card.ro.needs_reply %}<span class="tag tag-reply">Needs reply</span>{% endif %}
+          {% if card.no_texts %}<span class="tag tag-notexts">No texts</span>{% endif %}
+          {% if card.supplement_days is not none %}<span class="tag bucket-{{ card.supplement_bucket }}">Supplement: {{ card.supplement_days }}d</span>{% endif %}
+        </p>
+        <form hx-post="/ro/{{ card.ro.id }}/stage" hx-target="#board" hx-swap="outerHTML" method="post" action="/ro/{{ card.ro.id }}/stage">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="source" value="board">
+          <select name="stage" aria-label="Stage">
+            {% for s in ALL_STAGES %}<option value="{{ s.value }}"{% if s == card.ro.current_stage %} selected{% endif %}>{{ STAGE_LABELS[s] }}</option>{% endfor %}
+          </select>
+          <button type="submit" class="small">Move</button>
+        </form>
+      </article>
+      {% endfor %}
+    </section>
+    {% endfor %}
+  </div>
+</div>

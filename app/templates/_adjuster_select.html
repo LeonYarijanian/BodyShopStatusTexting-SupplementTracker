@@ -1,0 +1,9 @@
+<div id="adjuster-select">
+  <label>Adjuster
+    <select name="adjuster_id">
+      <option value="">No adjuster</option>
+      {% for a in adjusters %}<option value="{{ a.id }}"{% if selected and a.id == selected %} selected{% endif %}>{{ a.full_name }}</option>{% endfor %}
+    </select>
+  </label>
+  {% if error %}<small class="error">{{ error }}</small>{% endif %}
+</div>
