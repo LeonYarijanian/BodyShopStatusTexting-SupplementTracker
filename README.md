@@ -72,6 +72,12 @@ The RO page's **Send a text** box takes an optional photo (JPEG, PNG or GIF up t
 
 Settings > Texting > **Review request after delivery** (off by default) sends 1 text asking for a review, at 10:00 a chosen number of days (1 to 14) after an RO is delivered. It has its own consent: the check-in form and the RO page ask separately, and repair-update consent alone is not enough. While it is on, the Delivered text leaves out the review link so repair updates stay informational. Each RO gets at most 1 request, a phone is never asked twice within 365 days, reopening the RO cancels a request that hasn't gone out, and STOP covers it. START turns repair updates back on but not review requests.
 
+## AI-drafted adjuster emails
+
+Each submitted supplement has a **Draft email to adjuster** button. With `ANTHROPIC_API_KEY` set, Claude (`claude-opus-5-5`, low effort, structured JSON output, server-side refusal fallback on) drafts a short, polite follow-up from that supplement's facts only: S#, claim and RO numbers, vehicle, amount, submitted date, days waiting, adjuster first name and your signature. Customer names and phone numbers are never sent to Claude. The draft is rejected and the fixed template used instead when Claude declines or errors, when the draft leaves out the exact amount, claim number or RO number, or when it uses threatening words (lawsuit, attorney, legal action and so on). Without a key, every draft uses the template.
+
+Nothing is sent until a person clicks **Approve and send** on the draft page, after reading and editing it. Sending goes through the email settings (`./outbox` until live email is on), sets Reply-To to the sender, and logs an Email follow-up, which moves the next due date. Drafting an email costs a fraction of a cent per draft at current Claude pricing.
+
 ## Pitch demo
 
 After `alembic upgrade head` and `python -m app.seed --demo`, log in as `admin@demo.local` with password `demo-password-123` and follow the 7-step walkthrough in SPEC.md Section 14. Everything works offline: HTMX and Pico.css are vendored in `app/static/`.

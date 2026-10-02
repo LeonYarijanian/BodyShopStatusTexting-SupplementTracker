@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_STARTTLS: bool = True
     EMAIL_FROM: str = ""
+    # AI-drafted adjuster emails (Section 16 item 7). Without a key, drafts use the fixed template.
+    ANTHROPIC_API_KEY: str = ""
 
     @property
     def live_email(self) -> bool:

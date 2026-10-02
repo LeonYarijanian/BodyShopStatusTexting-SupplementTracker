@@ -103,6 +103,20 @@ class FollowUpMethod(StrEnum):
     OTHER = "OTHER"
 
 
+class AdjusterEmailStatus(StrEnum):
+    """Section 16 item 7: an email to an adjuster is a draft until a person approves and sends it."""
+
+    DRAFT = "DRAFT"
+    SENT = "SENT"
+    DISCARDED = "DISCARDED"
+    FAILED = "FAILED"
+
+
+class DraftSource(StrEnum):
+    AI = "AI"
+    TEMPLATE = "TEMPLATE"
+
+
 class AgingBucket(StrEnum):
     FRESH = "FRESH"
     WATCH = "WATCH"

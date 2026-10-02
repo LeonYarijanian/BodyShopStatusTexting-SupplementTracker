@@ -67,4 +67,8 @@
   </form>
 </details>
 <button type="button" class="small outline" onclick="copyFollowUpEmail({{ s.id }}, this)">Copy follow-up email</button>
+<form method="post" action="/supplements/{{ s.id }}/email-draft" class="inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button type="submit" class="small outline">Draft email to adjuster</button>
+</form>
 {% endif %}

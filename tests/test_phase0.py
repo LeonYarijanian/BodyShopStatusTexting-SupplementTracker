@@ -31,14 +31,20 @@ SECTION_5_TABLES = {
 }
 
 
+# Tables added after v1 by the Section 16 roadmap, each with its own migration.
+SECTION_16_TABLES = {"adjuster_emails"}
+
+
 def test_t0_1_migrations_create_exactly_the_13_tables(empty_db_url):
     run_migrations(empty_db_url)
     engine = create_engine(empty_db_url)
     names = set(inspect(engine).get_table_names())
     engine.dispose()
     names.discard("alembic_version")
-    assert names == SECTION_5_TABLES
-    assert len(names) == 13
+    v1_names = names - SECTION_16_TABLES
+    assert v1_names == SECTION_5_TABLES
+    assert len(v1_names) == 13
+    assert names - SECTION_5_TABLES == SECTION_16_TABLES
 
 
 def test_t0_2_login_right_and_wrong_password(client, base):

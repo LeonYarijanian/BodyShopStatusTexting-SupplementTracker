@@ -23,6 +23,8 @@ from sqlalchemy.types import TypeDecorator
 from app.business_days import UTC, utcnow
 from app.messaging.templates import default_review_request_template, default_stage_templates, default_stage_text_enabled
 from app.enums import (
+    AdjusterEmailStatus,
+    DraftSource,
     ConsentMethod,
     ConsentPurpose,
     ConsentStatus,
@@ -308,3 +310,24 @@ class SupplementEvent(TimestampMixin, Base):
     occurred_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, nullable=False)
 
     user: Mapped[User] = relationship()
+
+
+class AdjusterEmail(TimestampMixin, Base):
+    """Section 16 item 7: a follow-up email to an adjuster, drafted by Claude or the template, sent only after approval."""
+
+    __tablename__ = "adjuster_emails"
+
+    shop_id: Mapped[int] = shop_fk()
+    supplement_id: Mapped[int] = mapped_column(ForeignKey("supplements.id"), nullable=False, index=True)
+    status: Mapped[AdjusterEmailStatus] = mapped_column(enum_column(AdjusterEmailStatus), nullable=False, default=AdjusterEmailStatus.DRAFT)
+    source: Mapped[DraftSource] = mapped_column(enum_column(DraftSource), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    to_email: Mapped[str | None] = mapped_column(String(254), nullable=True)
+    subject: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    sent_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    sent_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    error_text: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    supplement: Mapped[Supplement] = relationship()

@@ -15,6 +15,7 @@ from app.config import Settings, get_settings
 from app.db import make_engine, make_session_factory
 from app.routes import TEMPLATES_DIR, is_htmx, templates
 from app.routes import (
+    adjuster_email_routes,
     auth_routes,
     board,
     import_routes,
@@ -79,6 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         import_routes,
         privacy_routes,
         media_routes,
+        adjuster_email_routes,
         webhooks,
     ):
         app.include_router(module.router)
