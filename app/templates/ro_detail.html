@@ -35,7 +35,7 @@
 
 {% include "_ro_messages.html" %}
 
-{% block panels %}{% endblock %}
+{% if show_supplements %}{% include "_ro_supplements.html" %}{% endif %}
 
 <section>
   <h3>Timeline</h3>

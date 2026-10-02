@@ -14,7 +14,7 @@ from app.auth import SESSION_IDLE_LIMIT, LoginRequired, csrf_protect
 from app.config import Settings, get_settings
 from app.db import make_engine, make_session_factory
 from app.routes import TEMPLATES_DIR, is_htmx, templates
-from app.routes import auth_routes, board, messages_routes, repair_orders, settings_routes
+from app.routes import auth_routes, board, messages_routes, repair_orders, settings_routes, supplements_routes
 
 STATIC_DIR = TEMPLATES_DIR.parent / "static"
 
@@ -56,7 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-    for module in (auth_routes, board, repair_orders, messages_routes, settings_routes):
+    for module in (auth_routes, board, repair_orders, messages_routes, supplements_routes, settings_routes):
         app.include_router(module.router)
 
     @app.exception_handler(LoginRequired)

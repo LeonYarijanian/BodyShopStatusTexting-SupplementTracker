@@ -13,6 +13,7 @@ from app.auth import CurrentUser, get_db, get_owned, require_user
 from app.business_days import local_to_utc, to_local, utcnow
 from app.enums import (
     ACTIVE_STAGES,
+    FOLLOW_UP_METHOD_LABELS,
     STAGE_LABELS,
     TERMINAL_STAGES,
     ConsentMethod,
@@ -21,9 +22,10 @@ from app.enums import (
     PayerType,
     Role,
     Stage,
+    SupplementEventType,
 )
 from app.messaging.templates import parse_us_phone
-from app.models import Adjuster, Consent, Customer, Insurer, Message, RepairOrder, StageEvent, Supplement, User
+from app.models import Adjuster, Consent, Customer, Insurer, Message, RepairOrder, StageEvent, Supplement, SupplementEvent, User
 from app.money import dollars_to_cents
 from app.routes import is_htmx, render
 
@@ -507,6 +509,18 @@ def timeline(db: Session, ro: RepairOrder) -> list[dict]:
         label = STAGE_LABELS[event.to_stage] if event.from_stage is None else f"{STAGE_LABELS[event.from_stage]} → {STAGE_LABELS[event.to_stage]}"
         detail = f"by {event.changed_by.full_name}" + (f" ({event.note})" if event.note else "")
         items.append({"at": event.changed_at, "id": event.id, "kind": "Stage", "text": label, "detail": detail})
+    for event in db.scalars(
+        select(SupplementEvent).join(Supplement, SupplementEvent.supplement_id == Supplement.id).where(Supplement.repair_order_id == ro.id)
+    ).all():
+        seq = db.get(Supplement, event.supplement_id).sequence_number
+        if event.event_type == SupplementEventType.FOLLOW_UP:
+            text = f"S{seq} follow-up ({FOLLOW_UP_METHOD_LABELS[event.follow_up_method]})"
+        elif event.from_status is None:
+            text = f"S{seq} created ({event.to_status.value})"
+        else:
+            text = f"S{seq} {event.from_status.value} → {event.to_status.value}"
+        detail = f"by {event.user.full_name}" + (f": {event.note}" if event.note else "")
+        items.append({"at": event.occurred_at, "id": event.id, "kind": "Supplement", "text": text, "detail": detail})
     for message in db.scalars(select(Message).where(Message.repair_order_id == ro.id)).all():
         direction = "Text in" if message.direction == MessageDirection.INBOUND else "Text out"
         items.append({"at": message.created_at, "id": message.id, "kind": direction, "text": message.body, "detail": message.status.value})
@@ -515,6 +529,7 @@ def timeline(db: Session, ro: RepairOrder) -> list[dict]:
 
 def ro_detail_context(db: Session, current: CurrentUser, ro: RepairOrder) -> dict:
     from app.routes.messages_routes import messages_panel_context
+    from app.routes.supplements_routes import ro_supplements_context
 
     now = utcnow()
     context = {
@@ -525,6 +540,7 @@ def ro_detail_context(db: Session, current: CurrentUser, ro: RepairOrder) -> dic
         "timeline": timeline(db, ro),
     }
     context.update(messages_panel_context(db, current, ro))
+    context.update(ro_supplements_context(db, current, ro))
     return context
 
 
