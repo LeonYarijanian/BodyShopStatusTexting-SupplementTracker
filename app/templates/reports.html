@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<h2>Reports</h2>
+<form method="get" action="/reports" class="grid">
+  <label>From<input type="date" name="date_from" value="{{ date_from }}"></label>
+  <label>To<input type="date" name="date_to" value="{{ date_to }}"></label>
+  <button type="submit">Update</button>
+</form>
+{% if range_error %}<p class="error">{{ range_error }}</p>{% endif %}
+
+{% set r = reports.cycle_time %}
+<section id="report-1">
+  <h3>1. Cycle time (keys-to-keys, calendar days)</h3>
+  {% if r.overall.count == 0 %}<p class="no-data">No data</p>{% else %}
+  <table class="compact">
+    <thead><tr><th>Payer group</th><th>Count</th><th>Average</th><th>Median</th><th>Max</th></tr></thead>
+    <tbody>
+      <tr><th>Overall</th><td>{{ r.overall.count }}</td><td>{{ r.overall.average|fmt1 }}</td><td>{{ r.overall.median|fmt1 }}</td><td>{{ r.overall.max|fmt1 }}</td></tr>
+      {% for g in r.groups %}<tr><td>{{ g.name }}</td><td>{{ g.count }}</td><td>{{ g.average|fmt1 }}</td><td>{{ g.median|fmt1 }}</td><td>{{ g.max|fmt1 }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{% set r = reports.decision_speed %}
+<section id="report-2">
+  <h3>2. Supplement decision speed (business days)</h3>
+  {% if r.count == 0 %}<p class="no-data">No data</p>{% else %}
+  {% for title, rows in (("By insurer", r.by_insurer), ("By adjuster", r.by_adjuster)) %}
+  <h4>{{ title }}</h4>
+  <table class="compact">
+    <thead><tr><th>{{ title[3:]|capitalize }}</th><th>Decided</th><th>Average days</th><th>Median days</th><th>Full approval rate</th><th>Dollar approval rate</th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr><td>{{ row.name }}</td><td>{{ row.decided }}</td><td>{{ row.average|fmt1 }}</td><td>{{ row.median|fmt1 }}</td>
+          <td>{% if row.full_approval_rate is none %}No data{% else %}{{ row.full_approval_rate|fmt1 }}%{% endif %}</td>
+          <td>{% if row.dollar_approval_rate is none %}No data{% else %}{{ row.dollar_approval_rate|fmt1 }}%{% endif %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+  {% endif %}
+</section>
+
+{% set r = reports.open_aging %}
+<section id="report-3">
+  <h3>3. Open supplement aging (now)</h3>
+  {% if r.count == 0 %}<p class="no-data">No data</p>{% else %}
+  <table class="compact">
+    <thead><tr><th>Bucket</th><th>Count</th><th>Dollars</th></tr></thead>
+    <tbody>
+      {% for b in r.buckets %}<tr><td><span class="tag bucket-{{ b.bucket }}">{{ b.bucket }}</span></td><td>{{ b.count }}</td><td>{{ b.cents|money }}</td></tr>{% endfor %}
+      <tr><th>Total</th><th>{{ r.total.count }}</th><th>{{ r.total.cents|money }}</th></tr>
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{% set r = reports.revenue %}
+<section id="report-4">
+  <h3>4. Revenue by payer</h3>
+  {% if r.count == 0 %}<p class="no-data">No data</p>{% else %}
+  {% for warning in r.warnings %}<p class="error concentration-warning">{{ warning }}</p>{% endfor %}
+  <table class="compact">
+    <thead><tr><th>Payer group</th><th>Revenue</th><th>Share</th></tr></thead>
+    <tbody>
+      {% for row in r.rows %}<tr><td>{{ row.name }}</td><td>{{ row.cents|money }}</td><td>{% if row.share is none %}No data{% else %}{{ row.share|fmt1 }}%{% endif %}</td></tr>{% endfor %}
+      <tr><th>Total</th><th>{{ r.total_cents|money }}</th><th></th></tr>
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{% set r = reports.days_waiting %}
+<section id="report-5">
+  <h3>5. Days waiting on supplements (calendar days)</h3>
+  {% if r.count == 0 %}<p class="no-data">No data</p>{% else %}
+  <p>Total waiting days: <strong>{{ r.total_days|fmt1 }}</strong> · Average per delivered insurance RO: <strong>{{ r.average_days|fmt1 }}</strong> ({{ r.count }} ROs)</p>
+  <table class="compact">
+    <thead><tr><th>RO</th><th>Vehicle</th><th>Waiting days</th></tr></thead>
+    <tbody>
+      {% for row in r.top %}<tr><td><a href="/ro/{{ row.ro.id }}">{{ row.ro.ro_number }}</a></td><td>{{ row.ro.vehicle }}</td><td>{{ row.days|fmt1 }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{% set r = reports.texting %}
+<section id="report-6">
+  <h3>6. Texting</h3>
+  {% if not r.has_data %}<p class="no-data">No data</p>{% else %}
+  <table class="compact">
+    <tbody>
+      <tr><th>Attempted</th><td>{{ r.attempted }}</td></tr>
+      <tr><th>Delivered</th><td>{{ r.delivered }}</td></tr>
+      <tr><th>Delivery rate</th><td>{% if r.delivery_rate is none %}No data{% else %}{{ r.delivery_rate|fmt1 }}%{% endif %}</td></tr>
+      <tr><th>Failed</th><td>{{ r.failed }}</td></tr>
+      <tr><th>Blocked for no consent</th><td>{{ r.blocked_no_consent }}</td></tr>
+      <tr><th>Blocked for opt-out</th><td>{{ r.blocked_opted_out }}</td></tr>
+      <tr><th>Opt-outs by keyword</th><td>{{ r.opt_outs_by_keyword }}</td></tr>
+      <tr><th>Inbound replies</th><td>{{ r.inbound_replies }}</td></tr>
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endblock %}

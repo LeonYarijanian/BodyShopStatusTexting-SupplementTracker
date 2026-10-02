@@ -10,7 +10,7 @@ from app.auth import CurrentUser, csrf_token
 from app.business_days import to_local, utcnow
 from app.enums import ACTIVE_STAGES, STAGE_LABELS, MessagingMode, Stage
 from app.models import ShopSettings
-from app.money import cents_to_input, format_cents
+from app.money import cents_to_input, format_cents, format_decimal
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -25,6 +25,7 @@ def _local_dt(value, tz, fmt="%Y-%m-%d %H:%M"):
 templates.env.filters["money"] = format_cents
 templates.env.filters["dollars_input"] = cents_to_input
 templates.env.filters["local_dt"] = _local_dt
+templates.env.filters["fmt1"] = lambda value: "No data" if value is None else format_decimal(value, 1)
 templates.env.globals["STAGE_LABELS"] = STAGE_LABELS
 templates.env.globals["ACTIVE_STAGES"] = ACTIVE_STAGES
 templates.env.globals["ALL_STAGES"] = list(Stage)
