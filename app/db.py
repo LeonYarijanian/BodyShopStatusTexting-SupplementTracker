@@ -6,8 +6,11 @@ from sqlalchemy.orm import sessionmaker
 
 
 def make_engine(database_url: str) -> Engine:
-    connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    engine = create_engine(database_url, connect_args=connect_args)
+    """SQLite for local and demo use; Postgres (postgresql+psycopg://...) when hosted."""
+    if database_url.startswith("sqlite"):
+        engine = create_engine(database_url, connect_args={"check_same_thread": False})
+    else:
+        engine = create_engine(database_url, pool_pre_ping=True)
     if database_url.startswith("sqlite"):
 
         @event.listens_for(engine, "connect")

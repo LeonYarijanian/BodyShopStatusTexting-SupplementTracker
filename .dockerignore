@@ -1,0 +1,12 @@
+.git
+.venv
+.env
+*.db
+__pycache__
+.pytest_cache
+import_tmp
+media
+outbox
+backups
+tests
+SPEC.md

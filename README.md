@@ -27,6 +27,25 @@ Run uvicorn with 1 worker only, so the scheduler runs once.
 
 The app starts in **DEMO** mode: texts are saved to the database and printed to the console, and nothing leaves the computer. **LIVE** mode sends real texts through Twilio and is allowed only when all 6 preconditions in SPEC.md Section 7 are true.
 
+## Hosting (Postgres, HTTPS, daily backups)
+
+SQLite is fine on one laptop for the pitch. A real shop needs the hosted setup in `docker-compose.yml`: Postgres 16, the app (1 worker, migrations run on start), Caddy for automatic HTTPS, and a daily backup job.
+
+1. On a server with Docker, point a DNS name (for example `app.yourdomain.com`) at it.
+2. `cp .env.example .env` and set `APP_SECRET_KEY`, `POSTGRES_PASSWORD`, `DOMAIN` and, for LIVE texting, the Twilio values.
+3. `docker compose up -d --build`
+4. Create the shop and its first admin (the password is read from `NEW_ADMIN_PASSWORD`, or prompted):
+   `docker compose exec app python -m app.seed --new-shop --name "Your Shop" --phone "(818) 555-0100" --admin-email you@yourshop.com --admin-name "Your Name"`
+5. Log in at `https://$DOMAIN`, fill in Settings, and switch to LIVE only when the Mode tab shows every precondition passing.
+
+**Backups:** the `backup` service runs `pg_dump` every day at `BACKUP_TIME_UTC` into `./backups/`, checks that each dump can be read back, and deletes dumps older than `BACKUP_KEEP_DAYS`. Copy `./backups/` off the server too (your host's volume snapshots or an `rclone` cron job), because a backup on the same disk does not survive losing the server. Take a backup by hand with `docker compose run --rm -e BACKUP_ONCE=1 backup`. Restore with:
+
+```
+docker compose exec -T db pg_restore --clean --if-exists --no-owner -U bodyshop -d bodyshop < backups/bodyshop-<stamp>.dump
+```
+
+To run the app against any Postgres without Docker, set `DATABASE_URL=postgresql+psycopg://user:password@host:5432/dbname` and run `alembic upgrade head`. To run the whole test suite against Postgres, set `TEST_POSTGRES_URL=postgresql+psycopg://user@host:5432/postgres` (each test gets its own database).
+
 ## Pitch demo
 
 After `alembic upgrade head` and `python -m app.seed --demo`, log in as `admin@demo.local` with password `demo-password-123` and follow the 7-step walkthrough in SPEC.md Section 14. Everything works offline: HTMX and Pico.css are vendored in `app/static/`.
@@ -58,4 +77,4 @@ Decisions where the spec was silent:
 - The default report range is today minus 89 days through today.
 - Days in shop stops counting at `delivered_at` for delivered ROs.
 - The demo seed's 0-day supplement is submitted at today 10:00 local, or at the current time if the seed runs before 10:00.
-- There is no way to create a real (non-demo) shop yet; v1 is the offline pitch build.
+- Real shops are created with `python -m app.seed --new-shop` (see Hosting).

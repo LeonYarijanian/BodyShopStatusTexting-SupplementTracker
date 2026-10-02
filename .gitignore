@@ -6,3 +6,6 @@ __pycache__/
 bodyshop.db
 *.db
 import_tmp/
+media/
+outbox/
+backups/

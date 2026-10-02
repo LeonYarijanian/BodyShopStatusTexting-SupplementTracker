@@ -1,6 +1,7 @@
 import os
 import re
 import shutil
+import uuid
 from pathlib import Path
 
 os.environ["APP_SECRET_KEY"] = "test-secret-key-0123456789abcdef0123456789abcdef"
@@ -11,6 +12,8 @@ import pytest  # noqa: E402
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import create_engine, text  # noqa: E402
+from sqlalchemy.engine import make_url  # noqa: E402
 
 from app.config import Settings  # noqa: E402
 from app.main import create_app  # noqa: E402
@@ -26,18 +29,72 @@ def run_migrations(database_url: str) -> None:
     command.upgrade(config, "head")
 
 
+# Set TEST_POSTGRES_URL (for example postgresql+psycopg://postgres@localhost:5432/postgres) to run every
+# test against Postgres instead of SQLite. Each test then gets its own database, copied from a migrated template.
+TEST_POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL", "")
+PG_TEMPLATE = "bodyshop_test_template"
+
+
+def _pg_admin():
+    return create_engine(TEST_POSTGRES_URL, isolation_level="AUTOCOMMIT")
+
+
+def _pg_url(database: str) -> str:
+    return make_url(TEST_POSTGRES_URL).set(database=database).render_as_string(hide_password=False)
+
+
+def _pg_create(database: str, template: str | None = None) -> str:
+    engine = _pg_admin()
+    with engine.connect() as conn:
+        conn.execute(text(f'DROP DATABASE IF EXISTS "{database}" WITH (FORCE)'))
+        conn.execute(text(f'CREATE DATABASE "{database}"' + (f' TEMPLATE "{template}"' if template else "")))
+    engine.dispose()
+    return _pg_url(database)
+
+
+def _pg_drop(database: str) -> None:
+    engine = _pg_admin()
+    with engine.connect() as conn:
+        conn.execute(text(f'DROP DATABASE IF EXISTS "{database}" WITH (FORCE)'))
+    engine.dispose()
+
+
 @pytest.fixture(scope="session")
-def migrated_template(tmp_path_factory) -> Path:
+def migrated_template(tmp_path_factory):
+    if TEST_POSTGRES_URL:
+        url = _pg_create(PG_TEMPLATE)
+        run_migrations(url)
+        # A template database must have no open connections when it is copied.
+        create_engine(url).dispose()
+        yield PG_TEMPLATE
+        _pg_drop(PG_TEMPLATE)
+        return
     path = tmp_path_factory.mktemp("template") / "template.db"
     run_migrations(f"sqlite:///{path}")
-    return path
+    yield path
 
 
 @pytest.fixture
-def db_url(tmp_path, migrated_template) -> str:
+def db_url(tmp_path, migrated_template):
+    if TEST_POSTGRES_URL:
+        name = f"bodyshop_test_{uuid.uuid4().hex[:12]}"
+        yield _pg_create(name, template=PG_TEMPLATE)
+        _pg_drop(name)
+        return
     path = tmp_path / "test.db"
     shutil.copy(migrated_template, path)
-    return f"sqlite:///{path}"
+    yield f"sqlite:///{path}"
+
+
+@pytest.fixture
+def empty_db_url(tmp_path):
+    """A brand-new database with no tables (SQLite file or Postgres database)."""
+    if TEST_POSTGRES_URL:
+        name = f"bodyshop_empty_{uuid.uuid4().hex[:12]}"
+        yield _pg_create(name)
+        _pg_drop(name)
+        return
+    yield f"sqlite:///{tmp_path / 'empty.db'}"
 
 
 def make_settings(db_url: str, **overrides) -> Settings:
@@ -58,7 +115,9 @@ def settings(db_url) -> Settings:
 
 @pytest.fixture
 def app(settings):
-    return create_app(settings)
+    app = create_app(settings)
+    yield app
+    app.state.engine.dispose()
 
 
 @pytest.fixture

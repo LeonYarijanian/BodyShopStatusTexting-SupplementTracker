@@ -2,13 +2,13 @@
 
 import os
 import re
-import sqlite3
 import subprocess
 import sys
 
 import pytest
 from fastapi.testclient import TestClient
 from freezegun import freeze_time
+from sqlalchemy import create_engine, inspect
 
 from app.money import dollars_to_cents, format_cents
 from tests.conftest import ROOT, get_csrf, login, run_migrations
@@ -31,11 +31,11 @@ SECTION_5_TABLES = {
 }
 
 
-def test_t0_1_migrations_create_exactly_the_13_tables(tmp_path):
-    path = tmp_path / "empty.db"
-    run_migrations(f"sqlite:///{path}")
-    with sqlite3.connect(path) as conn:
-        names = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+def test_t0_1_migrations_create_exactly_the_13_tables(empty_db_url):
+    run_migrations(empty_db_url)
+    engine = create_engine(empty_db_url)
+    names = set(inspect(engine).get_table_names())
+    engine.dispose()
     names.discard("alembic_version")
     assert names == SECTION_5_TABLES
     assert len(names) == 13

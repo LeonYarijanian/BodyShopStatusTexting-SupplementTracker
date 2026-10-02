@@ -613,18 +613,111 @@ def build_demo(db: Session, now: dt.datetime | None = None) -> Shop:
     return builder.shop
 
 
+def create_shop(
+    db: Session,
+    *,
+    name: str,
+    phone: str,
+    timezone: str,
+    admin_email: str,
+    admin_name: str,
+    admin_password: str,
+    address: str | None = None,
+) -> Shop:
+    """A real (non-demo) shop in DEMO mode, its settings row and its first ADMIN user. Raises ValueError."""
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    from app.auth import validate_new_password
+    from app.messaging.templates import parse_us_phone
+
+    name = (name or "").strip()
+    if not 1 <= len(name) <= 120:
+        raise ValueError("Shop name must be 1 to 120 characters.")
+    if db.scalar(select(Shop.id).where(Shop.name == name)) is not None:
+        raise ValueError(f"A shop named {name} already exists.")
+    phone_e164 = parse_us_phone(phone)
+    try:
+        ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ValueError(f"Unknown time zone: {timezone}") from None
+    address = (address or "").strip() or None
+    if address and len(address) > 200:
+        raise ValueError("Address must be at most 200 characters.")
+    admin_email = (admin_email or "").strip().lower()
+    if "@" not in admin_email or len(admin_email) > 254:
+        raise ValueError("Enter a valid admin email.")
+    if db.scalar(select(User.id).where(User.email == admin_email)) is not None:
+        raise ValueError(f"A user with email {admin_email} already exists.")
+    admin_name = (admin_name or "").strip()
+    if not 1 <= len(admin_name) <= 120:
+        raise ValueError("Admin name must be 1 to 120 characters.")
+    validate_new_password(admin_password or "")
+
+    shop = Shop(name=name, phone_e164=phone_e164, timezone=timezone, address=address)
+    db.add(shop)
+    db.flush()
+    db.add(ShopSettings(shop_id=shop.id, messaging_mode=MessagingMode.DEMO))
+    db.add(User(shop_id=shop.id, email=admin_email, password_hash=hash_password(admin_password), full_name=admin_name, role=Role.ADMIN))
+    db.commit()
+    return shop
+
+
+def _new_shop_password() -> str:
+    import getpass
+    import os
+
+    password = os.environ.get("NEW_ADMIN_PASSWORD")
+    if password:
+        return password
+    first = getpass.getpass("Password for the first admin (12+ characters): ")
+    if getpass.getpass("Type it again: ") != first:
+        raise ValueError("The passwords do not match.")
+    return first
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m app.seed", description="Load demo data for the pitch demo.")
+    parser = argparse.ArgumentParser(prog="python -m app.seed", description="Load demo data, or create a real shop.")
     parser.add_argument("--demo", action="store_true", help="build the demo shop Brand Blvd Collision (Demo)")
+    parser.add_argument("--new-shop", action="store_true", help="create a real shop and its first admin (password from NEW_ADMIN_PASSWORD or a prompt)")
+    parser.add_argument("--name", help="shop name, shown in every text")
+    parser.add_argument("--phone", help="shop phone, any US format")
+    parser.add_argument("--timezone", default=TZ, help=f"IANA time zone (default {TZ})")
+    parser.add_argument("--address", default=None)
+    parser.add_argument("--admin-email")
+    parser.add_argument("--admin-name")
     args = parser.parse_args(argv)
-    if not args.demo:
+    if args.demo == args.new_shop:
         parser.print_help()
         return 2
+    if args.new_shop:
+        missing = [flag for flag, value in (("--name", args.name), ("--phone", args.phone), ("--admin-email", args.admin_email), ("--admin-name", args.admin_name)) if not value]
+        if missing:
+            print(f"Missing: {', '.join(missing)}", file=sys.stderr)
+            return 2
+
     settings = Settings()
     engine = make_engine(settings.DATABASE_URL)
     session_factory = make_session_factory(engine)
     try:
         with session_factory() as db:
+            if args.new_shop:
+                try:
+                    shop = create_shop(
+                        db,
+                        name=args.name,
+                        phone=args.phone,
+                        timezone=args.timezone,
+                        address=args.address,
+                        admin_email=args.admin_email,
+                        admin_name=args.admin_name,
+                        admin_password=_new_shop_password(),
+                    )
+                except ValueError as exc:
+                    print(f"Not created: {exc}", file=sys.stderr)
+                    return 1
+                print(f"Created {shop.name} in DEMO mode. {args.admin_email.strip().lower()} can now log in as ADMIN.")
+                print("Next: Settings > Shop and Texting, then Settings > Mode when you are ready for LIVE.")
+                return 0
             if db.scalar(select(Shop.id).where(Shop.name == DEMO_SHOP_NAME)) is not None:
                 print("Demo shop already exists.")
                 return 1
