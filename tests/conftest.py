@@ -97,8 +97,11 @@ def login(client: TestClient, email: str, password: str = PASSWORD) -> str:
 
 
 def login_as(app, email: str, password: str = PASSWORD) -> TestClient:
-    """A new client logged in at the current (possibly frozen) time; `client.csrf` holds its token."""
-    client = TestClient(app)
+    """A new client logged in at the current (possibly frozen) time; `client.csrf` holds its token.
+
+    Uses https so the Secure session cookie (set when PUBLIC_BASE_URL is https) is sent back.
+    """
+    client = TestClient(app, base_url="https://testserver")
     client.csrf = login(client, email, password)
     return client
 

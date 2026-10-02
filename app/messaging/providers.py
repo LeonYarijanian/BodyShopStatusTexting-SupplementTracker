@@ -62,3 +62,34 @@ def get_provider(shop_settings: ShopSettings, app_settings: Settings):
     if shop_settings.messaging_mode == MessagingMode.LIVE:
         return TwilioProvider(shop_settings, app_settings)
     return DemoProvider()
+
+
+def live_preconditions(shop_settings: ShopSettings, app_settings: Settings) -> list[tuple[str, bool]]:
+    """The 6 conditions a shop must meet before switching to LIVE (Section 7), each with pass or fail."""
+    from app.messaging.templates import parse_us_phone
+
+    def valid_e164(value: str) -> bool:
+        try:
+            return bool(value) and parse_us_phone(value) == value
+        except ValueError:
+            return False
+
+    return [
+        ("ALLOW_LIVE_SMS=true in .env", bool(app_settings.ALLOW_LIVE_SMS)),
+        ("TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are set in .env", bool(app_settings.TWILIO_ACCOUNT_SID and app_settings.TWILIO_AUTH_TOKEN)),
+        ("The Twilio number is a valid E.164 number", valid_e164(shop_settings.twilio_from_e164)),
+        ("PUBLIC_BASE_URL is set and starts with https://", app_settings.PUBLIC_BASE_URL.startswith("https://")),
+        ("A2P 10DLC brand and campaign approved (ticked by an admin)", bool(shop_settings.a2p_10dlc_approved)),
+        ("Staff read the consent script at check-in (ticked by an admin)", bool(shop_settings.consent_script_confirmed)),
+    ]
+
+
+def switch_mode(shop_settings: ShopSettings, mode: MessagingMode, app_settings: Settings) -> list[str]:
+    """Switch DEMO/LIVE. Returns the failed preconditions; when any fail, the mode stays as it was."""
+    mode = MessagingMode(mode)
+    if mode == MessagingMode.LIVE:
+        failed = [label for label, passed in live_preconditions(shop_settings, app_settings) if not passed]
+        if failed:
+            return failed
+    shop_settings.messaging_mode = mode
+    return []

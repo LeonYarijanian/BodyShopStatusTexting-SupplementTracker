@@ -23,6 +23,7 @@ from app.routes import (
     reports_routes,
     settings_routes,
     supplements_routes,
+    webhooks,
 )
 
 STATIC_DIR = TEMPLATES_DIR.parent / "static"
@@ -65,7 +66,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-    for module in (auth_routes, board, repair_orders, messages_routes, supplements_routes, reports_routes, settings_routes, import_routes):
+    for module in (
+        auth_routes,
+        board,
+        repair_orders,
+        messages_routes,
+        supplements_routes,
+        reports_routes,
+        settings_routes,
+        import_routes,
+        webhooks,
+    ):
         app.include_router(module.router)
 
     @app.exception_handler(LoginRequired)

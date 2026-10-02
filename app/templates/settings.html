@@ -2,4 +2,189 @@
 {% block title %}Settings{% endblock %}
 {% block content %}
 <h2>Settings</h2>
+<nav class="tabs">
+  {% for key, label in tabs.items() %}<a href="/settings?tab={{ key }}"{% if key == tab %} class="active"{% endif %}>{{ label }}</a>{% endfor %}
+</nav>
+{% if error %}
+<div class="error" role="alert">
+  <p>{{ error }}</p>
+  {% if failed %}<ul class="failed-preconditions">{% for f in failed %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+</div>
+{% endif %}
+
+{% if tab == "shop" %}
+<form method="post" action="/settings">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="shop">
+  <label>Name<input name="name" value="{{ shop.name }}" maxlength="120" required></label>
+  <label>Phone<input name="phone" value="{{ shop.phone_e164 }}" required></label>
+  <label>Time zone (IANA name)<input name="timezone" value="{{ shop.timezone }}" required></label>
+  <label>Address<input name="address" value="{{ shop.address or '' }}" maxlength="200"></label>
+  <button type="submit">Save</button>
+</form>
+
+{% elif tab == "texting" %}
+<form method="post" action="/settings">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="texting">
+  <div class="grid">
+    <label>Quiet hours start (12:00 to 21:00)<input name="quiet_start" value="{{ settings.quiet_start.strftime('%H:%M') }}" required></label>
+    <label>Quiet hours end (08:00 to 11:00)<input name="quiet_end" value="{{ settings.quiet_end.strftime('%H:%M') }}" required></label>
+    <label>Cool-off minutes (0 to 60)<input name="cool_off_minutes" type="number" value="{{ settings.cool_off_minutes }}" required></label>
+    <label>Daily cap (1 to 10)<input name="daily_cap" type="number" value="{{ settings.daily_cap }}" required></label>
+  </div>
+  <label>Review URL (empty, or starts with https://)<input name="review_url" value="{{ settings.review_url }}"></label>
+  <p><small>Templates must stay informational: no discounts, offers or ads. Variables: {first_name} {shop_name} {shop_phone} {vehicle} {ro_number} {review_link_sentence}. At most 250 characters.</small></p>
+  <table class="compact">
+    <thead><tr><th>Stage</th><th>Texts</th><th>Template and live preview</th></tr></thead>
+    <tbody>
+      {% for row in stage_rows %}
+      <tr>
+        <td>{{ row.label }}</td>
+        <td><input type="checkbox" name="enabled_{{ row.stage.value }}" value="yes"{% if row.enabled %} checked{% endif %} aria-label="Text on {{ row.label }}"></td>
+        <td>
+          <textarea name="template_{{ row.stage.value }}" rows="2" maxlength="250"
+                    hx-post="/settings/preview" hx-trigger="keyup changed delay:300ms" hx-target="#preview-{{ row.stage.value }}"
+                    hx-vals='{"stage": "{{ row.stage.value }}"}'>{{ row.template }}</textarea>
+          <div class="preview" id="preview-{{ row.stage.value }}">{{ row.preview }}</div>
+        </td>
+      </tr>
+      {% endfor %}
+      <tr><td>Cancelled</td><td>Never</td><td>None</td></tr>
+    </tbody>
+  </table>
+  <button type="submit">Save</button>
+</form>
+
+{% elif tab == "supplements" %}
+<form method="post" action="/settings">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="supplements">
+  <label>Default follow-up interval, business days (1 to 10)<input name="default_follow_up_interval_business_days" type="number" value="{{ settings.default_follow_up_interval_business_days }}" required></label>
+  <label>Follow-up due time (06:00 to 17:00)<input name="follow_up_due_time" value="{{ settings.follow_up_due_time.strftime('%H:%M') }}" required></label>
+  <label>Concentration warning above this share of delivered revenue, % (10 to 90)<input name="concentration_warning_pct" type="number" value="{{ settings.concentration_warning_pct }}" required></label>
+  <button type="submit">Save</button>
+</form>
+
+{% elif tab == "insurers" %}
+{% for insurer in insurers %}
+<article>
+  <form method="post" action="/settings">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="insurers">
+    <input type="hidden" name="action" value="insurer"><input type="hidden" name="insurer_id" value="{{ insurer.id }}">
+    <div class="grid">
+      <label>Name<input name="name" value="{{ insurer.name }}" maxlength="120" required></label>
+      <label>Follow-up interval override (blank or 1 to 10)<input name="follow_up_interval_business_days" value="{{ insurer.follow_up_interval_business_days or '' }}"></label>
+      <label>Claims email<input name="claims_email" value="{{ insurer.claims_email or '' }}"></label>
+      <label>Claims phone<input name="claims_phone" value="{{ insurer.claims_phone_e164 or '' }}"></label>
+    </div>
+    <label><input type="checkbox" name="is_drp" value="yes"{% if insurer.is_drp %} checked{% endif %}> DRP</label>
+    <button type="submit" class="small">Save insurer</button>
+  </form>
+  <h5>Adjusters</h5>
+  {% for adjuster in insurer.adjusters %}
+  <form method="post" action="/settings" class="grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="insurers">
+    <input type="hidden" name="action" value="adjuster"><input type="hidden" name="adjuster_id" value="{{ adjuster.id }}"><input type="hidden" name="insurer_id" value="{{ insurer.id }}">
+    <input name="full_name" value="{{ adjuster.full_name }}" aria-label="Full name" required>
+    <input name="email" value="{{ adjuster.email or '' }}" aria-label="Email" placeholder="Email">
+    <input name="phone" value="{{ adjuster.phone_e164 or '' }}" aria-label="Phone" placeholder="Phone">
+    <button type="submit" class="small">Save</button>
+  </form>
+  {% endfor %}
+  <form method="post" action="/settings" class="grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="insurers">
+    <input type="hidden" name="action" value="adjuster"><input type="hidden" name="insurer_id" value="{{ insurer.id }}">
+    <input name="full_name" placeholder="New adjuster name" aria-label="New adjuster name" required>
+    <input name="email" placeholder="Email" aria-label="Email">
+    <input name="phone" placeholder="Phone" aria-label="Phone">
+    <button type="submit" class="small secondary">Add adjuster</button>
+  </form>
+</article>
+{% endfor %}
+<article>
+  <h4>Add insurer</h4>
+  <form method="post" action="/settings">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="insurers"><input type="hidden" name="action" value="insurer">
+    <div class="grid">
+      <label>Name<input name="name" maxlength="120" required></label>
+      <label>Follow-up interval override (blank or 1 to 10)<input name="follow_up_interval_business_days"></label>
+      <label>Claims email<input name="claims_email"></label>
+      <label>Claims phone<input name="claims_phone"></label>
+    </div>
+    <label><input type="checkbox" name="is_drp" value="yes"> DRP</label>
+    <button type="submit">Add insurer</button>
+  </form>
+</article>
+
+{% elif tab == "users" %}
+<table class="compact">
+  <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for user in users %}
+    <tr>
+      <td>{{ user.full_name }}</td><td>{{ user.email }}</td><td>{{ user.role }}</td><td>{{ 'Active' if user.is_active else 'Inactive' }}</td>
+      <td>
+        {% if user.is_active and user.id != current.id %}
+        <form method="post" action="/settings" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="users">
+          <input type="hidden" name="action" value="deactivate"><input type="hidden" name="user_id" value="{{ user.id }}">
+          <button type="submit" class="small outline secondary">Deactivate</button>
+        </form>
+        {% endif %}
+        <details class="inline-form"><summary>Reset password</summary>
+          <form method="post" action="/settings">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="users">
+            <input type="hidden" name="action" value="reset_password"><input type="hidden" name="user_id" value="{{ user.id }}">
+            <input type="password" name="password" minlength="12" placeholder="New password (12+ characters)" required>
+            <button type="submit" class="small">Reset</button>
+          </form>
+        </details>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<article>
+  <h4>Add user</h4>
+  <form method="post" action="/settings">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="users"><input type="hidden" name="action" value="add_user">
+    <div class="grid">
+      <label>Full name<input name="full_name" maxlength="120" required></label>
+      <label>Email<input type="email" name="email" required></label>
+      <label>Role<select name="role">{% for role in roles %}<option value="{{ role.value }}">{{ role.value }}</option>{% endfor %}</select></label>
+      <label>Password (12+ characters)<input type="password" name="password" minlength="12" required></label>
+    </div>
+    <button type="submit">Add user</button>
+  </form>
+</article>
+
+{% elif tab == "mode" %}
+<p>Current mode: <span class="badge mode-{{ settings.messaging_mode|lower }}">{{ settings.messaging_mode }}</span></p>
+<h4>LIVE mode preconditions</h4>
+<table class="compact">
+  <tbody>
+    {% for label, passed in preconditions %}
+    <tr><td>{{ loop.index }}. {{ label }}</td><td>{% if passed %}<span class="tag bucket-FRESH">pass</span>{% else %}<span class="tag bucket-CRITICAL">fail</span>{% endif %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p><small>The Twilio account must belong to the business, not to an individual. Before the first real shop goes LIVE, have a lawyer review the consent script and the templates.</small></p>
+<form method="post" action="/settings">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="mode"><input type="hidden" name="action" value="save">
+  <div class="grid">
+    <label>Twilio number (E.164)<input name="twilio_from_e164" value="{{ settings.twilio_from_e164 }}" placeholder="+18185550188"></label>
+    <label>Twilio messaging service SID (optional)<input name="twilio_messaging_service_sid" value="{{ settings.twilio_messaging_service_sid }}" placeholder="MG…"></label>
+  </div>
+  <label><input type="checkbox" name="a2p_10dlc_approved" value="yes"{% if settings.a2p_10dlc_approved %} checked{% endif %}> A2P 10DLC brand and campaign are approved in the Twilio console</label>
+  <label><input type="checkbox" name="consent_script_confirmed" value="yes"{% if settings.consent_script_confirmed %} checked{% endif %}> Staff read the consent script at check-in</label>
+  <label><input type="checkbox" name="twilio_handles_keyword_replies" value="yes"{% if settings.twilio_handles_keyword_replies %} checked{% endif %}> Twilio sends the STOP / START / HELP replies</label>
+  <button type="submit">Save</button>
+</form>
+<form method="post" action="/settings">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="tab" value="mode"><input type="hidden" name="action" value="switch">
+  {% if settings.messaging_mode == "DEMO" %}
+  <input type="hidden" name="mode" value="LIVE"><button type="submit" class="contrast">Switch to LIVE</button>
+  {% else %}
+  <input type="hidden" name="mode" value="DEMO"><button type="submit" class="secondary">Switch to DEMO</button>
+  {% endif %}
+</form>
+{% endif %}
 {% endblock %}
