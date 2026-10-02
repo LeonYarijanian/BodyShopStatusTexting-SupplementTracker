@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+bodyshop.db
+*.db
+import_tmp/
+media/
+outbox/
+backups/

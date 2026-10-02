@@ -1,0 +1,74 @@
+{# Buttons for one supplement. Needs: s, row, next_url, follow_up_methods, csrf_token, full (bool: show every action) #}
+{% if s.status == 'DRAFT' and full %}
+<details class="inline-form"><summary>Submit</summary>
+  <form method="post" action="/supplements/{{ s.id }}/transition">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ next_url }}">
+    <input type="hidden" name="to_status" value="SUBMITTED">
+    <label>Submitted time (blank = now)<input type="datetime-local" name="at"></label>
+    <button type="submit" class="small">Submit</button>
+  </form>
+</details>
+<form method="post" action="/supplements/{{ s.id }}/transition" class="inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ next_url }}">
+  <input type="hidden" name="to_status" value="WITHDRAWN">
+  <button type="submit" class="small outline secondary">Withdraw</button>
+</form>
+<details class="inline-form"><summary>Edit</summary>
+  <form method="post" action="/supplements/{{ s.id }}/edit">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ next_url }}">
+    <label>Description<input name="description" value="{{ s.description }}" maxlength="500" required></label>
+    <label>Requested ($)<input name="requested" value="{{ s.requested_cents|dollars_input }}" inputmode="decimal" required></label>
+    <button type="submit" class="small">Save</button>
+  </form>
+</details>
+{% elif s.status == 'SUBMITTED' %}
+{% if full %}
+<details class="inline-form"><summary>Approve</summary>
+  <form method="post" action="/supplements/{{ s.id }}/transition">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ next_url }}">
+    <input type="hidden" name="to_status" value="APPROVED">
+    <label>Decided time (blank = now)<input type="datetime-local" name="at"></label>
+    <button type="submit" class="small">Approve {{ s.requested_cents|money }}</button>
+  </form>
+</details>
+<details class="inline-form"><summary>Partially approve</summary>
+  <form method="post" action="/supplements/{{ s.id }}/transition">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ next_url }}">
+    <input type="hidden" name="to_status" value="PARTIALLY_APPROVED">
+    <label>Approved amount ($)<input name="approved" inputmode="decimal" required></label>
+    <label>Decided time (blank = now)<input type="datetime-local" name="at"></label>
+    <button type="submit" class="small">Partially approve</button>
+  </form>
+</details>
+<details class="inline-form"><summary>Deny</summary>
+  <form method="post" action="/supplements/{{ s.id }}/transition">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ next_url }}">
+    <input type="hidden" name="to_status" value="DENIED">
+    <label>Decided time (blank = now)<input type="datetime-local" name="at"></label>
+    <button type="submit" class="small">Deny</button>
+  </form>
+</details>
+<form method="post" action="/supplements/{{ s.id }}/transition" class="inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ next_url }}">
+  <input type="hidden" name="to_status" value="WITHDRAWN">
+  <button type="submit" class="small outline secondary">Withdraw</button>
+</form>
+{% endif %}
+<details class="inline-form"><summary>Log follow-up</summary>
+  <form method="post" action="/supplements/{{ s.id }}/follow-up">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ next_url }}">
+    <label>Method
+      <select name="method" required>
+        {% for value, label in follow_up_methods.items() %}<option value="{{ value.value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Note (optional)<input name="note" maxlength="500"></label>
+    <button type="submit" class="small">Log follow-up</button>
+  </form>
+</details>
+<button type="button" class="small outline" onclick="copyFollowUpEmail({{ s.id }}, this)">Copy follow-up email</button>
+<form method="post" action="/supplements/{{ s.id }}/email-draft" class="inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button type="submit" class="small outline">Draft email to adjuster</button>
+</form>
+{% endif %}

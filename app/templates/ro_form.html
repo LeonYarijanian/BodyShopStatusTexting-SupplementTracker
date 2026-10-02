@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}{% if ro %}Edit RO {{ ro.ro_number }}{% else %}New RO{% endif %}{% endblock %}
+{% block content %}
+<h2>{% if ro %}Edit RO {{ ro.ro_number }}{% else %}New RO{% endif %}</h2>
+{% if errors %}<p class="error" role="alert">Please fix the errors below.</p>{% endif %}
+<form method="post" action="{% if ro %}/ro/{{ ro.id }}/edit{% else %}/ro/new{% endif %}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <fieldset>
+    <legend><strong>Customer</strong></legend>
+    <label>Phone
+      <input name="phone" value="{{ values.phone or '' }}" required autofocus
+             hx-get="/customers/lookup" hx-trigger="blur" hx-target="#customer-fields" hx-swap="outerHTML"
+             hx-include="[name='phone'], #customer-fields"{% if errors.phone %} aria-invalid="true"{% endif %}>
+      {% if errors.phone %}<small class="error">{{ errors.phone }}</small>{% endif %}
+    </label>
+    {% with values=values, errors=errors %}{% include "_customer_fields.html" %}{% endwith %}
+  </fieldset>
+
+  <fieldset>
+    <legend><strong>Vehicle</strong></legend>
+    <div class="grid">
+      <label>RO number
+        <input name="ro_number" value="{{ values.ro_number or '' }}" maxlength="20" required{% if errors.ro_number %} aria-invalid="true"{% endif %}>
+        {% if errors.ro_number %}<small class="error">{{ errors.ro_number }}</small>{% endif %}
+      </label>
+      <label>Year
+        <input name="vehicle_year" type="number" value="{{ values.vehicle_year or '' }}" required{% if errors.vehicle_year %} aria-invalid="true"{% endif %}>
+        {% if errors.vehicle_year %}<small class="error">{{ errors.vehicle_year }}</small>{% endif %}
+      </label>
+      <label>Make
+        <input name="vehicle_make" value="{{ values.vehicle_make or '' }}" maxlength="40" required{% if errors.vehicle_make %} aria-invalid="true"{% endif %}>
+        {% if errors.vehicle_make %}<small class="error">{{ errors.vehicle_make }}</small>{% endif %}
+      </label>
+      <label>Model
+        <input name="vehicle_model" value="{{ values.vehicle_model or '' }}" maxlength="60" required{% if errors.vehicle_model %} aria-invalid="true"{% endif %}>
+        {% if errors.vehicle_model %}<small class="error">{{ errors.vehicle_model }}</small>{% endif %}
+      </label>
+    </div>
+    <div class="grid">
+      <label>Color
+        <input name="vehicle_color" value="{{ values.vehicle_color or '' }}" maxlength="30">
+        {% if errors.vehicle_color %}<small class="error">{{ errors.vehicle_color }}</small>{% endif %}
+      </label>
+      <label>VIN
+        <input name="vin" value="{{ values.vin or '' }}" maxlength="17"{% if errors.vin %} aria-invalid="true"{% endif %}>
+        {% if errors.vin %}<small class="error">{{ errors.vin }}</small>{% endif %}
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend><strong>Payer</strong></legend>
+    <label>Payer type
+      <select name="payer_type" id="payer-type" onchange="document.getElementById('insurance-fields').hidden = (this.value === 'CUSTOMER_PAY');">
+        <option value="INSURANCE"{% if values.payer_type == 'INSURANCE' %} selected{% endif %}>Insurance</option>
+        <option value="CUSTOMER_PAY"{% if values.payer_type == 'CUSTOMER_PAY' %} selected{% endif %}>Customer pay</option>
+      </select>
+      {% if errors.payer_type %}<small class="error">{{ errors.payer_type }}</small>{% endif %}
+    </label>
+    <div id="insurance-fields"{% if values.payer_type == 'CUSTOMER_PAY' %} hidden{% endif %}>
+      <div class="grid">
+        <label>Insurer
+          <select name="insurer_id" hx-get="/adjusters/options" hx-trigger="change" hx-target="#adjuster-select" hx-swap="outerHTML"{% if errors.insurer_id %} aria-invalid="true"{% endif %}>
+            <option value="">Choose…</option>
+            {% for i in insurers %}<option value="{{ i.id }}"{% if values.insurer_id|string == i.id|string %} selected{% endif %}>{{ i.name }}</option>{% endfor %}
+          </select>
+          {% if errors.insurer_id %}<small class="error">{{ errors.insurer_id }}</small>{% endif %}
+        </label>
+        {% with adjusters=adjusters, selected=(values.adjuster_id|int if values.adjuster_id else None), error=errors.adjuster_id %}{% include "_adjuster_select.html" %}{% endwith %}
+        <label>Claim number
+          <input name="claim_number" value="{{ values.claim_number or '' }}" maxlength="40">
+          {% if errors.claim_number %}<small class="error">{{ errors.claim_number }}</small>{% endif %}
+        </label>
+      </div>
+      <details>
+        <summary>Add adjuster</summary>
+        <div class="grid">
+          <input name="new_adjuster_name" placeholder="Full name" maxlength="120">
+          <input name="new_adjuster_email" placeholder="Email" maxlength="254">
+          <input name="new_adjuster_phone" placeholder="Phone">
+          <button type="button" class="secondary" hx-post="/adjusters" hx-include="[name='insurer_id'], [name^='new_adjuster_']" hx-target="#adjuster-select" hx-swap="outerHTML">Add adjuster</button>
+        </div>
+        {% if not current.is_admin %}<small>Only admins can add insurers, in Settings.</small>{% endif %}
+      </details>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend><strong>Estimate and check-in</strong></legend>
+    {% if locations|length >= 2 %}
+    <label>Location
+      <select name="location_id"{% if errors.location_id %} aria-invalid="true"{% endif %}>
+        <option value="">Choose…</option>
+        {% for location in locations %}<option value="{{ location.id }}"{% if values.location_id|string == location.id|string %} selected{% endif %}>{{ location.name }}{% if not location.is_active %} (closed){% endif %}</option>{% endfor %}
+      </select>
+      {% if errors.location_id %}<small class="error">{{ errors.location_id }}</small>{% endif %}
+    </label>
+    {% endif %}
+    <div class="grid">
+      <label>Original estimate ($)
+        <input name="original_estimate" inputmode="decimal" value="{{ values.original_estimate or '' }}" required{% if errors.original_estimate %} aria-invalid="true"{% endif %}>
+        {% if errors.original_estimate %}<small class="error">{{ errors.original_estimate }}</small>{% endif %}
+      </label>
+      <label>Checked in
+        <input name="checked_in_at" type="datetime-local" value="{{ values.checked_in_at or '' }}" required{% if errors.checked_in_at %} aria-invalid="true"{% endif %}>
+        {% if errors.checked_in_at %}<small class="error">{{ errors.checked_in_at }}</small>{% endif %}
+      </label>
+    </div>
+  </fieldset>
+
+  {% if not ro %}
+  <fieldset>
+    <legend><strong>Consent</strong></legend>
+    <blockquote>{{ consent_script }}</blockquote>
+    <label><input type="checkbox" name="consent" value="yes"{% if values.consent %} checked{% endif %}> The customer said yes</label>
+    <label>Method
+      <select name="consent_method">
+        <option value="">Choose…</option>
+        <option value="IN_PERSON_VERBAL"{% if values.consent_method == 'IN_PERSON_VERBAL' %} selected{% endif %}>In person (verbal)</option>
+        <option value="SIGNED_FORM"{% if values.consent_method == 'SIGNED_FORM' %} selected{% endif %}>Signed form</option>
+      </select>
+      {% if errors.consent_method %}<small class="error">{{ errors.consent_method }}</small>{% endif %}
+    </label>
+    {% if review_requests_on %}
+    <blockquote>{{ review_consent_script }}</blockquote>
+    <label><input type="checkbox" name="review_consent" value="yes"{% if values.review_consent %} checked{% endif %}> The customer also said yes to 1 review request after pickup</label>
+    {% endif %}
+  </fieldset>
+  {% endif %}
+
+  <button type="submit">{% if ro %}Save RO{% else %}Create RO{% endif %}</button>
+  {% if ro %}<a href="/ro/{{ ro.id }}">Cancel</a>{% endif %}
+</form>
+{% endblock %}

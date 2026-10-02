@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Supplements{% endblock %}
+{% block content %}
+<h2>Supplements</h2>
+<nav class="tabs">
+  {% for key, tab_info in tabs.items() %}<a href="/supplements?tab={{ key }}"{% if key == tab %} class="active"{% endif %}>{{ tab_info[0] }}</a>{% endfor %}
+</nav>
+<article class="summary">
+  <strong>Open: {{ summary.open_count }}</strong> ·
+  Dollars waiting: <strong>{{ summary.dollars_waiting|money }}</strong> ·
+  {% for bucket, count in summary.bucket_counts.items() %}<span class="tag bucket-{{ bucket }}">{{ bucket }}: {{ count }}</span> {% endfor %}·
+  Follow-ups due: <strong>{{ summary.follow_ups_due }}</strong>
+</article>
+<div class="overflow-auto">
+<table class="compact striped">
+  <thead><tr><th>RO</th><th>Customer</th><th>Vehicle</th><th>Insurer</th><th>Adjuster</th><th>S#</th><th>Status</th><th>Requested</th><th>Days open</th><th>Follow-ups</th><th>Next follow-up due</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for row in rows %}{% set s = row.s %}{% set ro = s.repair_order %}
+    <tr{% if row.due %} class="due"{% endif %} data-supplement-id="{{ s.id }}">
+      <td><a href="/ro/{{ ro.id }}">{{ ro.ro_number }}</a>{% if row.due %} <span class="tag tag-due">Due</span>{% endif %}{% if current.multi_location and not current.location_id and ro.location %} <span class="tag">{{ ro.location.name }}</span>{% endif %}</td>
+      <td>{{ ro.customer.first_name }} {{ ro.customer.last_name or '' }}</td>
+      <td>{{ ro.vehicle }}</td>
+      <td>{{ ro.insurer.name if ro.insurer else '' }}</td>
+      <td>{{ s.adjuster.full_name if s.adjuster else '' }}</td>
+      <td>S{{ s.sequence_number }}</td>
+      <td>{{ s.status }}</td>
+      <td>{{ s.requested_cents|money }}</td>
+      <td{% if row.bucket %} class="bucket-{{ row.bucket }}"{% endif %}>{{ row.days_open if row.days_open is not none else '' }}</td>
+      <td>{{ s.follow_up_count }}</td>
+      <td>{{ s.next_follow_up_due_at|local_dt(tz) }}</td>
+      <td>{% with next_url="/supplements?tab=" ~ tab, full=False %}{% include "_supplement_actions.html" %}{% endwith %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="12">No supplements here.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

@@ -1,0 +1,5 @@
+<li id="counters"{% if oob %} hx-swap-oob="true"{% endif %} class="counters">
+  <span class="counter">Needs reply: {{ topbar.needs_reply }}</span>
+  <span class="counter">Follow-ups due: {{ topbar.follow_ups_due }}</span>
+  <span class="counter">Waiting: {{ topbar.waiting }}</span>
+</li>

@@ -1,0 +1,14 @@
+<div id="customer-fields" class="grid">
+  <label>First name
+    <input name="first_name" value="{{ values.first_name or '' }}" maxlength="60" required{% if errors.first_name %} aria-invalid="true"{% endif %}>
+    {% if errors.first_name %}<small class="error">{{ errors.first_name }}</small>{% endif %}
+  </label>
+  <label>Last name
+    <input name="last_name" value="{{ values.last_name or '' }}" maxlength="60">
+    {% if errors.last_name %}<small class="error">{{ errors.last_name }}</small>{% endif %}
+  </label>
+  <label>Email
+    <input type="email" name="email" value="{{ values.email or '' }}" maxlength="254">
+    {% if errors.email %}<small class="error">{{ errors.email }}</small>{% endif %}
+  </label>
+</div>

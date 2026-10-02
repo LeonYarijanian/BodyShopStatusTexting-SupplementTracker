@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}RO {{ ro.ro_number }}{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h2>RO {{ ro.ro_number }} · {{ ro.vehicle }}</h2>
+  <a href="/ro/{{ ro.id }}/edit" role="button" class="secondary">Edit RO</a>
+</header>
+<table class="compact">
+  <tbody>
+    <tr><th>Customer</th><td>{% if customer.anonymized_at %}<em>Customer data deleted {{ customer.anonymized_at|local_dt(tz, "%Y-%m-%d") }} at their request</em>{% else %}{{ customer.first_name }} {{ customer.last_name or '' }} · {{ customer.phone_e164 }}{% endif %}</td>
+        <th>Current stage</th><td><strong>{{ STAGE_LABELS[ro.current_stage] }}</strong></td></tr>
+    <tr><th>Payer</th><td>{{ payer }}</td>
+        <th>Days in shop</th><td>{{ days_in_shop }}d</td></tr>
+    {% if ro.location and (current.multi_location or not ro.location.is_active) %}<tr><th>Location</th><td colspan="3">{{ ro.location.name }}{% if not ro.location.is_active %} (closed){% endif %} · {{ ro.location.phone_e164 }}</td></tr>{% endif %}
+    <tr><th>Insurer</th><td>{{ ro.insurer.name if ro.insurer else '—' }}</td>
+        <th>Adjuster</th><td>{{ ro.adjuster.full_name if ro.adjuster else '—' }}</td></tr>
+    <tr><th>Claim number</th><td>{{ ro.claim_number or '—' }}</td>
+        <th>Original estimate</th><td>{{ ro.original_estimate_cents|money }}</td></tr>
+    {% if status_link %}<tr><th>Customer status page</th><td colspan="3"><a href="{{ status_link }}" target="_blank" rel="noopener">{{ status_link }}</a> <small>(use {status_link} in a text template, or paste it into a text)</small></td></tr>{% endif %}
+    <tr><th>Checked in</th><td>{{ ro.checked_in_at|local_dt(tz) }}</td>
+        <th>Final invoice</th><td>{{ ro.final_invoice_cents|money if ro.final_invoice_cents is not none else '—' }}{% if ro.delivered_at %} · delivered {{ ro.delivered_at|local_dt(tz) }}{% endif %}</td></tr>
+  </tbody>
+</table>
+
+<section>
+  <h3>Stage</h3>
+  <form method="post" action="/ro/{{ ro.id }}/stage" class="grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="source" value="ro">
+    <select name="stage" aria-label="Stage">
+      {% for s in stages %}<option value="{{ s.value }}"{% if s == ro.current_stage %} selected{% endif %}>{{ STAGE_LABELS[s] }}</option>{% endfor %}
+    </select>
+    <input name="final_invoice" inputmode="decimal" placeholder="Final invoice $ (needed for Delivered)" value="{{ ro.final_invoice_cents|dollars_input }}">
+    <button type="submit">Move</button>
+  </form>
+</section>
+
+{% if customer.anonymized_at %}
+<article><p>Texting is off for this RO because the customer's personal data was deleted at their request.</p></article>
+{% else %}
+{% include "_ro_messages.html" %}
+{% endif %}
+
+{% if show_supplements %}{% include "_ro_supplements.html" %}{% endif %}
+
+<section>
+  <h3>Timeline</h3>
+  <table class="compact">
+    <tbody>
+      {% for item in timeline %}
+      <tr><td>{{ item.at|local_dt(tz) }}</td><td>{{ item.kind }}</td><td>{{ item.text }}</td><td>{{ item.detail }}</td></tr>
+      {% else %}
+      <tr><td>Nothing yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% if current.is_admin and not customer.anonymized_at %}
+<section>
+  <details>
+    <summary>Delete this customer's personal data</summary>
+    <p>Use this when a customer asks you to delete their data. Their name, phone, email, consent history, message text, VIN and claim numbers are removed from every RO they have. The ROs stay (vehicle, amounts, stages and dates) so your reports stay correct. Texting stops for good. This cannot be undone.</p>
+    <form method="post" action="/customers/{{ customer.id }}/anonymize">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Type DELETE to confirm<input name="confirm" autocomplete="off" required></label>
+      <button type="submit" class="contrast">Delete customer data</button>
+    </form>
+  </details>
+</section>
+{% endif %}
+{% endblock %}

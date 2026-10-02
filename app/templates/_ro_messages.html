@@ -1,0 +1,113 @@
+<section id="messages-panel">
+  {% if oob %}{% with oob=True %}{% include "_counters.html" %}{% endwith %}{% endif %}
+  {% if panel_error %}<p class="error" role="alert">{{ panel_error }}</p>{% endif %}
+  <div class="grid-2">
+    <article>
+      <h3>Consent</h3>
+      <p><strong>{{ consent_label }}</strong>{% if consent %} · {{ consent_method_label }} · {{ consent.recorded_at|local_dt(tz) }}{% endif %}</p>
+      {% if opted_out_by_text %}
+      <button type="button" disabled>Record consent</button>
+      <p><small>Customer opted out by text. They must text START to resubscribe.</small></p>
+      {% else %}
+      <details>
+        <summary role="button" class="secondary">Record consent</summary>
+        <form hx-post="/ro/{{ ro.id }}/consent" hx-target="#messages-panel" hx-swap="outerHTML" method="post" action="/ro/{{ ro.id }}/consent">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <blockquote>{{ consent_script }}</blockquote>
+          <label>Method
+            <select name="consent_method" required>
+              <option value="">Choose…</option>
+              <option value="IN_PERSON_VERBAL">In person (verbal)</option>
+              <option value="SIGNED_FORM">Signed form</option>
+            </select>
+          </label>
+          <button type="submit">Customer said yes</button>
+        </form>
+      </details>
+      {% endif %}
+
+      {% if review_requests_on %}
+      <p>Review request: <strong>{{ review_consent_label }}</strong></p>
+      {% if review_consent_label != "Opted in" and not review_opted_out %}
+      <details>
+        <summary role="button" class="secondary outline">Record review consent</summary>
+        <form hx-post="/ro/{{ ro.id }}/consent" hx-target="#messages-panel" hx-swap="outerHTML" method="post" action="/ro/{{ ro.id }}/consent">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="purpose" value="REVIEW_REQUESTS">
+          <blockquote>{{ review_consent_script }}</blockquote>
+          <label>Method
+            <select name="consent_method" required>
+              <option value="">Choose…</option>
+              <option value="IN_PERSON_VERBAL">In person (verbal)</option>
+              <option value="SIGNED_FORM">Signed form</option>
+            </select>
+          </label>
+          <button type="submit">Customer said yes</button>
+        </form>
+      </details>
+      {% endif %}
+      {% endif %}
+
+      {% if ro.needs_reply %}
+      <form hx-post="/ro/{{ ro.id }}/mark-handled" hx-target="#messages-panel" hx-swap="outerHTML" method="post" action="/ro/{{ ro.id }}/mark-handled">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <p><span class="tag tag-reply">Needs reply</span></p>
+        <button type="submit" class="secondary">Mark reply handled</button>
+      </form>
+      {% endif %}
+    </article>
+
+    <article>
+      <h3>Messages</h3>
+      <div class="thread">
+        {% for item in thread %}
+        {% set m = item.m %}
+        <div class="msg {{ 'inbound' if m.direction == 'INBOUND' else 'outbound' }}" data-message-id="{{ m.id }}" data-status="{{ m.status }}">
+          {% if m.media_token %}<a href="/media/{{ m.media_token }}" target="_blank" rel="noopener"><img class="msg-photo" src="/media/{{ m.media_token }}" alt="Photo sent with this text"></a>{% endif %}
+          {{ m.body }}
+          <small>
+            {% if m.status == 'SCHEDULED' %}Scheduled for {{ item.scheduled_for }}{% else %}{{ m.status }} · {{ item.time }}{% endif %}
+            {% if m.error_text %} · {{ m.error_text }}{% endif %}
+          </small>
+          {% if m.status == 'SCHEDULED' %}
+          <form hx-post="/messages/{{ m.id }}/cancel" hx-target="#messages-panel" hx-swap="outerHTML" method="post" action="/messages/{{ m.id }}/cancel">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="small outline">Cancel</button>
+          </form>
+          {% elif m.status == 'FAILED' %}
+          <form hx-post="/messages/{{ m.id }}/retry" hx-target="#messages-panel" hx-swap="outerHTML" method="post" action="/messages/{{ m.id }}/retry">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="small outline">Retry</button>
+          </form>
+          {% endif %}
+        </div>
+        {% else %}
+        <p>No messages yet.</p>
+        {% endfor %}
+      </div>
+
+      <form hx-post="/ro/{{ ro.id }}/messages" hx-target="#messages-panel" hx-swap="outerHTML" hx-encoding="multipart/form-data" method="post" action="/ro/{{ ro.id }}/messages" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Send a text
+          <textarea name="body" maxlength="320" rows="3" required
+                    oninput="this.form.querySelector('.char-count').textContent = this.value.length + ' / 320';"></textarea>
+        </label>
+        <small class="char-count">0 / 320</small>
+        <label>Photo (optional: JPEG, PNG or GIF up to 5 MB, sent as a picture message)
+          <input type="file" name="photo" accept="image/jpeg,image/png,image/gif">
+        </label>
+        <button type="submit">Send</button>
+      </form>
+
+      {% if is_demo %}
+      <form hx-post="/ro/{{ ro.id }}/simulate-reply" hx-target="#messages-panel" hx-swap="outerHTML" method="post" action="/ro/{{ ro.id }}/simulate-reply">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Simulate customer reply
+          <input name="body" placeholder="Thanks! What time can I pick it up?" required>
+        </label>
+        <button type="submit" class="secondary">Simulate reply</button>
+      </form>
+      {% endif %}
+    </article>
+  </div>
+</section>

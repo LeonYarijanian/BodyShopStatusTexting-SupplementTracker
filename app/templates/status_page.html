@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% if ro %}Repair status · {{ shop.name }}{% else %}Link not active{% endif %}</title>
+  <link rel="stylesheet" href="/static/pico.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <main class="container status-page">
+    {% if not ro %}
+    <h1>This link is not active</h1>
+    <p>Status links stop working 30 days after pickup. Please call the shop for an update.</p>
+    {% else %}
+    <p><strong>{{ shop.name }}</strong>{% if location_name %} · {{ location_name }}{% endif %}</p>
+    <h1>Your {{ ro.vehicle }}</h1>
+    <p class="status-now">Now: <strong>{{ stage_label }}</strong></p>
+    {% if ro.current_stage == "READY_FOR_PICKUP" %}<p class="notice">Your car is ready for pickup. Call {{ shop_phone }} to set a time.</p>{% endif %}
+    {% if ro.current_stage == "ON_HOLD" %}<p>The repair is on hold. We'll call you with details.</p>{% endif %}
+    <ol class="milestones">
+      {% for m in milestones %}
+      <li class="{{ 'done' if m.done else '' }} {{ 'current' if m.current else '' }}">{{ m.label }}</li>
+      {% endfor %}
+    </ol>
+    <h2>Updates</h2>
+    <ul>
+      {% for h in history %}<li>{{ h.at|local_dt(tz, "%b %d, %I:%M %p") }}: {{ h.label }}</li>{% endfor %}
+    </ul>
+    <p>Last updated {{ updated_at|local_dt(tz, "%b %d, %I:%M %p") }}. Questions? Call <a href="tel:{{ shop_phone_e164 }}">{{ shop_phone }}</a>{% if address %} · {{ address }}{% endif %}.</p>
+    {% endif %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Board{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h2>Job Board</h2>
+  <div>
+    <a href="/ro/new" role="button">New RO</a>
+    {% if messaging_mode == "DEMO" %}
+    <form method="post" action="/demo/send-now" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="secondary">Send scheduled texts now</button>
+    </form>
+    {% endif %}
+  </div>
+</header>
+{% include "_board.html" %}
+{% endblock %}

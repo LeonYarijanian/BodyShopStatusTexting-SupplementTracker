@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Follow-up email{% endblock %}
+{% block content %}
+{% set ro = supplement.repair_order %}
+<h2>Follow-up email · RO {{ ro.ro_number }} S{{ supplement.sequence_number }}</h2>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<p>
+  {% if email.source == "AI" %}<span class="tag tag-reply">Drafted by Claude</span> Read it carefully: you are the one sending it.
+  {% else %}<span class="tag">Standard template</span> Claude is not set up or could not draft this one, so this is the fixed template.{% endif %}
+  Status: <strong>{{ email.status }}</strong>{% if email.sent_at %} · sent {{ email.sent_at|local_dt(tz) }}{% endif %}{% if email.error_text %} · {{ email.error_text }}{% endif %}
+</p>
+<details>
+  <summary>Facts the draft must match</summary>
+  <table class="compact"><tbody>
+    {% for key, value in facts.items() %}<tr><th>{{ key.replace('_', ' ') }}</th><td>{{ value }}</td></tr>{% endfor %}
+  </tbody></table>
+</details>
+{% if email.status == "DRAFT" %}
+<form method="post" action="/email-drafts/{{ email.id }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>To (adjuster's email)<input type="email" name="to_email" value="{{ email.to_email or '' }}" placeholder="adjuster@insurer.example"></label>
+  <label>Subject<input name="subject" value="{{ email.subject }}" maxlength="200" required></label>
+  <label>Email<textarea name="body" rows="14" maxlength="4000" required>{{ email.body }}</textarea></label>
+  <div class="grid">
+    <button type="submit" name="action" value="send">Approve and send</button>
+    <button type="submit" name="action" value="save" class="secondary">Save draft</button>
+    <button type="submit" name="action" value="redraft" class="secondary outline">Draft again</button>
+    <button type="submit" name="action" value="discard" class="outline contrast">Discard</button>
+  </div>
+  <p><small>Replies go to your email. Sending also logs a follow-up (Email) on the supplement.</small></p>
+</form>
+{% else %}
+<article>
+  <p><strong>To:</strong> {{ email.to_email }}<br><strong>Subject:</strong> {{ email.subject }}</p>
+  <pre style="white-space: pre-wrap">{{ email.body }}</pre>
+</article>
+{% endif %}
+<p><a href="/ro/{{ ro.id }}">Back to RO {{ ro.ro_number }}</a></p>
+{% endblock %}
